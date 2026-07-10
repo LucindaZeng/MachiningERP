@@ -1,0 +1,48 @@
+name: 数据或集成需求
+description: 提交外部行情、设备、银行、税务、门户或系统接口需求
+title: "[Integration]: "
+labels:
+  - integration
+body:
+  - type: input
+    id: requirement_id
+    attributes:
+      label: 关联需求编号
+      placeholder: MKT-02 / SEC-06
+    validations:
+      required: true
+  - type: textarea
+    id: systems
+    attributes:
+      label: 来源、目标与业务事件
+      description: 哪个系统在何时向哪个系统传递什么？
+    validations:
+      required: true
+  - type: textarea
+    id: contract
+    attributes:
+      label: 数据契约
+      description: 唯一键、版本、字段、单位、币种、时区、精度、状态和示例
+    validations:
+      required: true
+  - type: textarea
+    id: reliability
+    attributes:
+      label: 可靠性与对账
+      description: 认证、幂等、重试、限流、错误队列、补传、监控和业务对账
+    validations:
+      required: true
+  - type: textarea
+    id: security_license
+    attributes:
+      label: 安全、隐私与许可
+      description: 数据分类、权限、秘密、加密、保留、许可、再分发和审计
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收与故障案例
+      description: 正常、重复、乱序、超时、中断、恢复、过期和异常数据如何验证？
+    validations:
+      required: true

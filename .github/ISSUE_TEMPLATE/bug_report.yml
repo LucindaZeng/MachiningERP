@@ -1,0 +1,65 @@
+name: 缺陷报告
+description: 报告与批准需求、数据口径或验收案例不一致的问题
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: input
+    id: requirement_id
+    attributes:
+      label: 关联需求/验收编号
+      placeholder: MES-13 / UAT-REWORK-B
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: 环境
+      options:
+        - 本地开发
+        - 测试
+        - UAT
+        - 生产
+    validations:
+      required: true
+  - type: textarea
+    id: current
+    attributes:
+      label: 实际结果
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望结果
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 脱敏复现步骤
+      placeholder: |
+        1. 使用脱敏订单...
+        2. 执行...
+        3. 观察...
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: 业务与数据影响
+      description: 是否影响库存、交付、质量放行、成本、财务、权限或外部协同？
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 脱敏证据
+      description: 日志、追踪编号、截图或报表；不得包含秘密和真实敏感数据
+  - type: checkboxes
+    id: security
+    attributes:
+      label: 安全确认
+      options:
+        - label: 此问题不包含应通过私有安全渠道报告的漏洞或凭据
+          required: true

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全问题
+    url: https://github.com/LucindaZeng/MachiningERP/security
+    about: 不要公开提交漏洞、凭据或真实敏感数据

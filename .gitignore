@@ -1,0 +1,42 @@
+# macOS and editors
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node and frontend
+node_modules/
+dist/
+build/
+.next/
+coverage/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# Office temporary files
+~$*.docx
+~$*.xlsx
+~$*.pptx
+
+# Generated QA and local artifacts
+.tmp/
+*.log
+
+# Local source attachment retained outside version control by default
+_cgi-bin_mmwebwx-bin_webwxgetmsgimg__*
