@@ -15,6 +15,6 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
       - name: Validate repository baseline
         run: python3 tools/check_repository.py
