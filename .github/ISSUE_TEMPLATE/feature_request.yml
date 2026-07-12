@@ -17,15 +17,17 @@ body:
     attributes:
       label: 业务领域
       options:
+        - 组织与部门 ORG
         - 报价与合同 QTN
         - 主数据与工程 MDM
         - PMC/MRP/APS
         - 采购与供应商 SRM
         - 金属材料价格 MKT
-        - 生产 MES
+        - 生产/后工序/组装 MES
         - 品质 QMS
         - 仓储 WMS
         - 财务与成本 FIN
+        - 行政考勤与劳务 ADM
         - 单据与报表 DOC
         - 预警 ALT
         - 客户协同 CUS

@@ -13,18 +13,33 @@
 - 由系统生成报价单、成本分析、外贸资料、进度表、对账单和经营分析。
 - 建立实时金属材料价格中心，为采购、财务和业务提供按权限隔离的行情、报价和成本影响视图。
 - 为财务和老板提供有数据口径、来源引用、权限隔离和审计记录的 AI 分析问答。
+- 从业务订单提交开始量化业务经理/财务审核、订单评审、MRP、采购、收料、检验、生产、委外和包装的节点耗时与超期责任。
+- 区分模具订单、样品订单和正式业务订单；模具/样品允许按审批免费，正式业务订单强制收费，三类订单均完整核算成本。
+- 每次返工拆出独立子订单，重新核算全部重复工序；区分正常二次委外应付与供应商责任无偿返工，并计算责任毛损失、追偿和企业净损失。
+- 支持香港代生产客户价格规则：在客户主数据勾选特定客户后，仅其正式业务订单按输入价格70%计价；样品、模具及其他客户保持原价，其他流程全部不变。
+- 每一道实际工艺独立核算成本：保存本工序新增成本、转入累计成本、单位成本、标准/实际差异，并汇总到订单、产品和客户毛利。
 
 ## 需求基线
 
-当前详细规划基线为 [《制造业 ERP 软件规划方案 V1.2》](docs/制造业ERP软件规划方案_V1.2.docx)。Word 文档用于 ERP 选型、RFP、实施范围和验收；仓库内 Markdown 文档用于研发协作和版本化决策。
+当前详细规划基线为 [《制造业 ERP 软件规划方案 V2.1》](docs/制造业ERP软件规划方案_V2.1.docx)。Word 文档用于 ERP 选型、RFP、实施范围和验收；仓库内 Markdown 文档用于研发协作和版本化决策。
 
 重点专题：
 
 - [产品范围与模块边界](docs/product/vision-and-scope.md)
+- [十部门组织与应用蓝图](docs/product/department-operating-model.md)
+- [十部门功能、权限、预警与报表矩阵](docs/product/department-control-matrix.md)
 - [需求基线与 Epic 映射](docs/product/requirements-baseline.md)
 - [跨工序返工流程](docs/workflows/cross-operation-rework.md)
+- [返工子订单、重复成本与责任归集](docs/workflows/rework-cost-accounting.md)
+- [香港代生产客户正式订单70%价格规则](docs/workflows/hong-kong-manufacturing-orders.md)
+- [工序级制造成本核算](docs/features/operation-level-costing.md)
+- [报价到全检包装的订单全生命周期](docs/workflows/order-to-pack-lifecycle.md)
 - [实时金属材料价格中心](docs/features/metal-price-center.md)
-- [财务与老板 AI 分析问答](docs/features/finance-executive-ai.md)
+- [财务与老板 AI 分析问答（DeepSeek V4 Pro）](docs/features/finance-executive-ai.md)
+- [尾数返工与入库](docs/workflows/tail-quantity-rework.md)
+- [长时间工单未完结监控](docs/features/aged-work-order-monitoring.md)
+- [架机表与机台负荷管理](docs/features/machine-loading-plan.md)
+- [开发文档](docs/development/development-guide.md)、[接口文档](docs/api/api-reference.md)、[开发进度表](docs/development/development-schedule.md)与 [TODO](TODO.md)
 - [系统上下文与集成边界](docs/architecture/system-context.md)
 - [数据与安全治理](docs/architecture/data-and-security.md)
 - [实施路线图](docs/roadmap.md)
@@ -34,14 +49,18 @@
 | 领域 | 主要能力 |
 | --- | --- |
 | 报价与订单 | 图纸询价、相似产品、材料与工序成本、审批、合同评审、订单变更、客户协同 |
+| 香港客户价格规则 | 客户级勾选、正式订单输入价×70%、样品模具不转换、原价/计算价留痕、其余流程不变 |
 | 工程与 PLM | 物料、图纸、BOM、工艺、工装刀具、检验标准、版本与工程变更 |
 | PMC/MRP/APS | 净需求、动态齐套、采购/生产/委外建议、有限排程、资源冲突和交期模拟 |
 | 采购/SRM | 供应商在线报价、比价定标、订单确认、进度、ASN、送货、质量和对账 |
 | 金属价格中心 | 许可行情、供应商报价、历史成交、落地价、价格快照、预警和成本影响 |
 | MES | 一码到底、扫码执行、工序防跳、跨序返工、异常、人员设备绩效与 OEE |
-| QMS | IQC、首件、巡检、完工/出货检验、MRB、CAPA、8D、质量成本与追溯 |
+| 后工序与组装 | 清洗、丝印、镭雕、打磨、振磨、全检包装，以及独立组装BOM、工单、测试和组件谱系 |
+| QMS | IQC、首检、巡检、末件、FAI、完工/出货检验、MRB、CAPA、8D、质量成本与追溯 |
 | WMS | ASN 收货、状态库存、库位、余料、备料、拣配、盘点、仓位图和呆滞料 |
 | 财务与成本 | 总账、应收应付、资金、费用、资产、税务、预算、存货和制造成本、月结 |
+| 工序级成本 | 切料至包装每道工艺独立成本卡、成本累计流转、标准实际差异、在制与返工成本 |
+| 行政考勤 | 人员、班次、打卡、请假加班、异常分析、考勤报告和多劳务结算 |
 | 门户与报表 | 客户/供应商门户、系统生成文件、预警升级、BI 驾驶舱和指标治理 |
 | AI 分析 | 财务和老板自然语言问答、原因下钻、情景模拟、单据引用、权限和审计 |
 
@@ -65,7 +84,8 @@
 2. Issue 必须说明角色、业务场景、规则、数据、权限、预警、报表和验收证据。
 3. 影响接口、数据模型、安全或关键流程的变更先提交 ADR。
 4. 使用真实但脱敏的订单、批次和财务数据进行验收；禁止把生产敏感数据提交到仓库。
-5. 报价、库存、成本、财务和 AI 结果必须可追溯到源单据与数据截止时间。
+5. 财务、总经办、生产、品质、后工序、工程、PMC、采购、委外和行政使用独立工作台与权限范围。
+6. 报价、库存、成本、财务、考勤和 AI 结果必须可追溯到源单据与数据截止时间。
 
 ## 本地检查
 
