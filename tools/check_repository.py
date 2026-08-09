@@ -29,6 +29,8 @@ REQUIRED = [
     ".github/workflows/repository-check.yml",
     "docs/制造业ERP软件规划方案_V2.0.docx",
     "docs/制造业ERP软件规划方案_V2.1.docx",
+    "docs/制造业ERP软件规划方案_V2.2.docx",
+    "docs/制造业ERP软件规划方案_V2.3.docx",
     "docs/workflows/tail-quantity-rework.md",
     "docs/features/aged-work-order-monitoring.md",
     "docs/features/machine-loading-plan.md",
@@ -121,7 +123,7 @@ def check_planning_document(errors: list[str]) -> None:
     builder = ROOT / "tools" / "build_erp_plan.py"
     if builder.exists() and 'DOC_VERSION = "V2.1"' not in builder.read_text(encoding="utf-8"):
         errors.append("tools/build_erp_plan.py is not configured for V2.1")
-    docx = ROOT / "docs" / "制造业ERP软件规划方案_V2.1.docx"
+    docx = ROOT / "docs" / "制造业ERP软件规划方案_V2.3.docx"
     if docx.exists():
         try:
             with zipfile.ZipFile(docx) as archive:
@@ -131,7 +133,7 @@ def check_planning_document(errors: list[str]) -> None:
                 if "word/document.xml" not in archive.namelist():
                     errors.append("DOCX is missing word/document.xml")
         except zipfile.BadZipFile:
-            errors.append("V2.1 planning document is not a valid DOCX ZIP")
+            errors.append("V2.3 planning document is not a valid DOCX ZIP")
 
 
 def check_prohibited_files(files: list[Path], errors: list[str]) -> None:

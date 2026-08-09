@@ -20,9 +20,9 @@ def bullet_block(items: list[str]) -> list[str]:
 
 def build() -> None:
     lines = [
-        "# 十部门功能、权限、预警与报表矩阵",
+        "# 十三部门功能、权限、预警与报表矩阵",
         "",
-        "> 本文件由 `tools/build_department_matrix.py` 根据 `tools/department_controls.py` 生成。详细业务流程、字段、系统边界和验收场景以 ERP Word 规划方案 V2.0 为准。",
+        "> 本文件由 `tools/build_department_matrix.py` 根据 `tools/department_controls.py` 生成。详细业务流程、字段、系统边界和验收场景以 ERP Word 规划方案 V2.2 为准。",
         "",
         "## 全公司统一审核权限规则",
         "",

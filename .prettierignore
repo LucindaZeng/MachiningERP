@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+pnpm-lock.yaml
+.tmp
+design/
+docs/*.docx
+example/
+services/api/prisma/migrations
