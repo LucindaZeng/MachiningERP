@@ -1,0 +1,1094 @@
+// MachiningERP 数据模型 —— M0 平台底座 + auth/identity/org 切片。
+//
+// 约定（docs/development/development-guide.md 第 4 节）：
+//   * 表名 snake_case 复数，模型名 PascalCase；
+//   * 所有业务表必备 created_at/by、updated_at/by、version（乐观锁）；
+//   * 单据类表额外必备 doc_no、status 状态机，并把每次状态迁移写入 doc_timelines；
+//   * 金额一律整数最小货币单位（BigInt）+ 币种字段；数量一律 Decimal，禁止 Float。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// 枚举
+// ============================================================
+
+/// 账号分域（ADR-0004）：内部员工与门户账号不共享会话
+enum LoginAudience {
+  INTERNAL
+  PORTAL
+
+  @@map("login_audience")
+}
+
+/// 在职状态：离职后**用户名**释放可被他人再次登记，唯一编码永不释放
+enum EmploymentStatus {
+  ACTIVE
+  LEFT
+
+  @@map("employment_status")
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  DISABLED
+
+  @@map("user_status")
+}
+
+enum RequestStatus {
+  SUBMITTED
+  APPROVED
+  REJECTED
+  CANCELLED
+
+  @@map("request_status")
+}
+
+enum PasswordResetStatus {
+  SUBMITTED
+  RESET_DONE
+  REJECTED
+
+  @@map("password_reset_status")
+}
+
+/// 单据编号重置策略
+enum NumberResetPolicy {
+  NONE
+  DAILY
+  MONTHLY
+  YEARLY
+
+  @@map("number_reset_policy")
+}
+
+enum TimelineNodeStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+  ABNORMAL
+
+  @@map("timeline_node_status")
+}
+
+enum ApprovalTaskStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SKIPPED
+
+  @@map("approval_task_status")
+}
+
+enum ApprovalInstanceStatus {
+  RUNNING
+  APPROVED
+  REJECTED
+  CANCELLED
+
+  @@map("approval_instance_status")
+}
+
+enum DataScopeType {
+  ALL
+  DEPARTMENT
+  DEPARTMENT_AND_BELOW
+  SELF
+  ASSIGNED_CUSTOMERS
+
+  @@map("data_scope_type")
+}
+
+// ============================================================
+// org —— 组织与部门（13 部门口径，命名以 example/基础资料 为准）
+// ============================================================
+
+model Department {
+  id        String  @id @default(uuid()) @db.Uuid
+  code      String  @unique @db.VarChar(32)
+  name      String  @db.VarChar(64)
+  shortName String? @map("short_name") @db.VarChar(32)
+  parentId  String? @map("parent_id") @db.Uuid
+  sortOrder Int     @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
+
+  parent   Department?  @relation("DepartmentTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Department[] @relation("DepartmentTree")
+  users    User[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String?   @map("created_by") @db.VarChar(32)
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.VarChar(32)
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(0)
+
+  @@index([parentId])
+  @@map("departments")
+}
+
+// ============================================================
+// identity —— 用户、唯一编码、角色权限、数据权限
+// ============================================================
+
+/// 已发放的唯一编码。**只增不删**：即使用户被清理，编码也不回收，
+/// 保证历史单据与审计永远能解析到原始责任人（业务规格「用户名释放规则」）。
+model IssuedUserCode {
+  code     String   @id @db.VarChar(32)
+  issuedAt DateTime @default(now()) @map("issued_at")
+  /// 发放来源：ACCOUNT_REQUEST / SEED / MIGRATION
+  source   String   @default("ACCOUNT_REQUEST") @db.VarChar(32)
+  note     String?  @db.VarChar(255)
+
+  @@map("issued_user_codes")
+}
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// 唯一编码：注册时生成，终身不变、永不复用；所有单据与审计引用本字段
+  userCode String @unique @map("user_code") @db.VarChar(32)
+
+  /// 登录用户名。离职释放后置空（NULL），从而允许新员工登记同一个用户名。
+  account  String?       @db.VarChar(32)
+  audience LoginAudience @default(INTERNAL)
+
+  /// 离职前使用过的用户名，仅用于「该用户名原由某某使用」的提示与审计
+  formerAccount     String?   @map("former_account") @db.VarChar(32)
+  accountReleasedAt DateTime? @map("account_released_at")
+
+  displayName  String  @map("display_name") @db.VarChar(64)
+  departmentId String? @map("department_id") @db.Uuid
+  contact      String? @db.VarChar(64)
+  email        String? @db.VarChar(128)
+
+  passwordHash String @map("password_hash") @db.VarChar(255)
+
+  status           UserStatus       @default(ACTIVE)
+  employmentStatus EmploymentStatus @default(ACTIVE) @map("employment_status")
+  leftAt           DateTime?        @map("left_at")
+  lastLoginAt      DateTime?        @map("last_login_at")
+
+  department Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  roles      UserRole[]
+  dataScopes DataScope[]
+  sessions   AuthSession[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String?   @map("created_by") @db.VarChar(32)
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.VarChar(32)
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(0)
+
+  /// 同一账号域内在用的用户名唯一；NULL（已释放）在 Postgres 中不参与唯一性判定
+  @@unique([audience, account])
+  @@index([departmentId])
+  @@index([formerAccount])
+  @@map("users")
+}
+
+model Role {
+  id          String  @id @default(uuid()) @db.Uuid
+  code        String  @unique @db.VarChar(48)
+  name        String  @db.VarChar(64)
+  description String? @db.VarChar(255)
+  /// 系统内置角色不可删除
+  isSystem    Boolean @default(false) @map("is_system")
+
+  permissions RolePermission[]
+  users       UserRole[]
+  dataScopes  DataScope[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.VarChar(32)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.VarChar(32)
+  version   Int      @default(0)
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(uuid()) @db.Uuid
+  code        String  @unique @db.VarChar(64)
+  name        String  @db.VarChar(64)
+  category    String  @db.VarChar(32)
+  description String? @db.VarChar(255)
+
+  roles RolePermission[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  grantedAt DateTime @default(now()) @map("granted_at")
+  grantedBy String?  @map("granted_by") @db.VarChar(32)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  grantedAt DateTime @default(now()) @map("granted_at")
+  grantedBy String?  @map("granted_by") @db.VarChar(32)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+/// 数据权限：查询层强制注入（api-conventions.md「认证与权限」）
+model DataScope {
+  id       String        @id @default(uuid()) @db.Uuid
+  userId   String?       @map("user_id") @db.Uuid
+  roleId   String?       @map("role_id") @db.Uuid
+  resource String        @db.VarChar(48)
+  type     DataScopeType
+  /// 具体范围值（部门编码、客户编号数组等）
+  values   Json?
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role? @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([userId, resource])
+  @@index([roleId, resource])
+  @@map("data_scopes")
+}
+
+// ============================================================
+// auth —— 会话、登录风控、账户申请、密码重置
+// ============================================================
+
+model AuthSession {
+  id        String        @id @default(uuid()) @db.Uuid
+  userId    String        @map("user_id") @db.Uuid
+  /// JWT jti，注销后写 revokedAt，实现服务端可撤销
+  tokenId   String        @unique @map("token_id") @db.VarChar(64)
+  audience  LoginAudience
+  issuedAt  DateTime      @default(now()) @map("issued_at")
+  expiresAt DateTime      @map("expires_at")
+  revokedAt DateTime?     @map("revoked_at")
+  ip        String?       @db.VarChar(64)
+  userAgent String?       @map("user_agent") @db.VarChar(255)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_sessions")
+}
+
+/// 登录失败计数：连续失败 3 次强制图形验证码，8 次临时锁定
+model LoginAttempt {
+  id           String        @id @default(uuid()) @db.Uuid
+  audience     LoginAudience
+  account      String        @db.VarChar(32)
+  failureCount Int           @default(0) @map("failure_count")
+  lastFailedAt DateTime?     @map("last_failed_at")
+  lockedUntil  DateTime?     @map("locked_until")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([audience, account])
+  @@map("login_attempts")
+}
+
+model CaptchaChallenge {
+  id         String    @id @default(uuid()) @db.Uuid
+  /// 大小写不敏感比较，存归一化后的大写文本
+  code       String    @db.VarChar(16)
+  expiresAt  DateTime  @map("expires_at")
+  consumedAt DateTime? @map("consumed_at")
+  ip         String?   @db.VarChar(64)
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("captcha_challenges")
+}
+
+/// 登录页「申请账户」：姓名、部门、用户名、密码；IT 审批后开通
+model AccountRequest {
+  id        String @id @default(uuid()) @db.Uuid
+  requestNo String @unique @map("request_no") @db.VarChar(32)
+
+  employeeName String  @map("employee_name") @db.VarChar(64)
+  department   String  @db.VarChar(64)
+  departmentId String? @map("department_id") @db.Uuid
+  account      String  @db.VarChar(32)
+  passwordHash String  @map("password_hash") @db.VarChar(255)
+  contact      String? @db.VarChar(64)
+  reason       String? @db.VarChar(500)
+
+  /// 提交那一刻即发放的唯一编码，审批通过后原样落到 users.user_code
+  userCode   String  @unique @map("user_code") @db.VarChar(32)
+  /// 该用户名此前的使用人（离职释放场景）
+  reusedFrom String? @map("reused_from") @db.VarChar(128)
+
+  status       RequestStatus @default(SUBMITTED)
+  submittedAt  DateTime      @default(now()) @map("submitted_at")
+  decidedAt    DateTime?     @map("decided_at")
+  decidedBy    String?       @map("decided_by") @db.VarChar(32)
+  rejectReason String?       @map("reject_reason") @db.VarChar(500)
+  approvedUser String?       @map("approved_user_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  version   Int      @default(0)
+
+  @@index([status])
+  @@index([account])
+  @@map("account_requests")
+}
+
+/// 忘记密码 = 派单给 IT 系统管理员重置（不做邮箱/短信自助找回）
+model PasswordResetRequest {
+  id        String @id @default(uuid()) @db.Uuid
+  requestNo String @unique @map("request_no") @db.VarChar(32)
+
+  audience      LoginAudience
+  account       String        @db.VarChar(32)
+  applicantName String        @map("applicant_name") @db.VarChar(64)
+  department    String        @db.VarChar(64)
+  contact       String        @db.VarChar(64)
+  reason        String?       @db.VarChar(500)
+
+  status      PasswordResetStatus @default(SUBMITTED)
+  submittedAt DateTime            @default(now()) @map("submitted_at")
+  handledAt   DateTime?           @map("handled_at")
+  handledBy   String?             @map("handled_by") @db.VarChar(32)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  version   Int      @default(0)
+
+  @@index([status])
+  @@index([audience, account])
+  @@map("password_reset_requests")
+}
+
+// ============================================================
+// platform —— 编号、审计、节点计时、领域事件、幂等、审批流、通知
+// ============================================================
+
+model DocNumberRule {
+  id           String            @id @default(uuid()) @db.Uuid
+  docType      String            @unique @map("doc_type") @db.VarChar(32)
+  prefix       String            @db.VarChar(16)
+  /// 日期段格式：'' | yyyy | yyyyMM | yyyyMMdd
+  datePattern  String            @default("yyyyMMdd") @map("date_pattern") @db.VarChar(16)
+  padding      Int               @default(4)
+  resetPolicy  NumberResetPolicy @default(DAILY) @map("reset_policy")
+  separator    String            @default("") @db.VarChar(4)
+  description  String?           @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("doc_number_rules")
+}
+
+model DocNumberSequence {
+  id        String @id @default(uuid()) @db.Uuid
+  docType   String @map("doc_type") @db.VarChar(32)
+  /// 重置周期键：NONE 用 '-'，DAILY 用 yyyyMMdd，以此类推
+  periodKey String @map("period_key") @db.VarChar(16)
+  lastValue Int    @default(0) @map("last_value")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([docType, periodKey])
+  @@map("doc_number_sequences")
+}
+
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  /// 责任人一律记唯一编码，不记用户名
+  actorUserCode String?  @map("actor_user_code") @db.VarChar(32)
+  action        String   @db.VarChar(64)
+  entityType    String   @map("entity_type") @db.VarChar(64)
+  entityId      String?  @map("entity_id") @db.VarChar(64)
+  before        Json?
+  after         Json?
+  ip            String?  @db.VarChar(64)
+  traceId       String?  @map("trace_id") @db.VarChar(64)
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@index([actorUserCode])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+/// 单据状态迁移与节点耗时（api-conventions.md「审计与计时」）
+model DocTimeline {
+  id            String             @id @default(uuid()) @db.Uuid
+  docType       String             @map("doc_type") @db.VarChar(32)
+  docId         String             @map("doc_id") @db.VarChar(64)
+  node          String             @db.VarChar(64)
+  sequence      Int                @default(0)
+  status        TimelineNodeStatus @default(IN_PROGRESS)
+  enteredAt     DateTime           @default(now()) @map("entered_at")
+  leftAt        DateTime?          @map("left_at")
+  durationMs    BigInt?            @map("duration_ms")
+  ownerUserCode String?            @map("owner_user_code") @db.VarChar(32)
+  ownerDept     String?            @map("owner_dept") @db.VarChar(64)
+  remark        String?            @db.VarChar(500)
+
+  @@index([docType, docId])
+  @@map("doc_timelines")
+}
+
+/// 领域事件出箱表：预警中心、节点计时、BI 均以事件为事实来源
+model OutboxEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  eventId     String    @unique @map("event_id") @db.VarChar(64)
+  name        String    @db.VarChar(64)
+  payload     Json
+  occurredAt  DateTime  @default(now()) @map("occurred_at")
+  traceId     String?   @map("trace_id") @db.VarChar(64)
+  publishedAt DateTime? @map("published_at")
+  attempts    Int       @default(0)
+  lastError   String?   @map("last_error") @db.VarChar(500)
+
+  @@index([publishedAt])
+  @@index([name])
+  @@map("outbox_events")
+}
+
+/// POST 建单据的幂等记录（api-conventions.md「写操作幂等」）
+model IdempotencyRecord {
+  id           String   @id @default(uuid()) @db.Uuid
+  scope        String   @db.VarChar(64)
+  key          String   @db.VarChar(128)
+  requestHash  String   @map("request_hash") @db.VarChar(64)
+  responseBody Json?    @map("response_body")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@unique([scope, key])
+  @@map("idempotency_records")
+}
+
+model ApprovalFlow {
+  id          String  @id @default(uuid()) @db.Uuid
+  code        String  @unique @db.VarChar(48)
+  name        String  @db.VarChar(64)
+  docType     String  @map("doc_type") @db.VarChar(32)
+  description String? @db.VarChar(255)
+  isActive    Boolean @default(true) @map("is_active")
+
+  steps     ApprovalFlowStep[]
+  instances ApprovalInstance[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  version   Int      @default(0)
+
+  @@map("approval_flows")
+}
+
+model ApprovalFlowStep {
+  id       String @id @default(uuid()) @db.Uuid
+  flowId   String @map("flow_id") @db.Uuid
+  sequence Int
+  name     String @db.VarChar(64)
+  /// 审批角色编码，例如 SALES_MANAGER / FINANCE / GM_OFFICE
+  roleCode String @map("role_code") @db.VarChar(48)
+  /// SLA 时限（小时），超时进入预警升级
+  slaHours Int?   @map("sla_hours")
+  /// 条件表达式（留空表示必经节点），例如备料订单固定经总经办
+  condition Json?
+
+  flow  ApprovalFlow   @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  tasks ApprovalTask[]
+
+  @@unique([flowId, sequence])
+  @@map("approval_flow_steps")
+}
+
+model ApprovalInstance {
+  id       String                 @id @default(uuid()) @db.Uuid
+  flowId   String                 @map("flow_id") @db.Uuid
+  docType  String                 @map("doc_type") @db.VarChar(32)
+  docId    String                 @map("doc_id") @db.VarChar(64)
+  docNo    String?                @map("doc_no") @db.VarChar(32)
+  status   ApprovalInstanceStatus @default(RUNNING)
+  /// T0：审批链计时起点
+  startedAt DateTime              @default(now()) @map("started_at")
+  endedAt   DateTime?             @map("ended_at")
+
+  flow  ApprovalFlow   @relation(fields: [flowId], references: [id])
+  tasks ApprovalTask[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  version   Int      @default(0)
+
+  @@index([docType, docId])
+  @@map("approval_instances")
+}
+
+model ApprovalTask {
+  id            String             @id @default(uuid()) @db.Uuid
+  instanceId    String             @map("instance_id") @db.Uuid
+  stepId        String             @map("step_id") @db.Uuid
+  sequence      Int
+  status        ApprovalTaskStatus @default(PENDING)
+  assigneeRole  String             @map("assignee_role") @db.VarChar(48)
+  decidedBy     String?            @map("decided_by") @db.VarChar(32)
+  decidedAt     DateTime?          @map("decided_at")
+  /// 驳回必须填写理由（报价修改申请等场景为硬校验）
+  comment       String?            @db.VarChar(500)
+  arrivedAt     DateTime           @default(now()) @map("arrived_at")
+  durationMs    BigInt?            @map("duration_ms")
+
+  instance ApprovalInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  step     ApprovalFlowStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+
+  @@index([instanceId])
+  @@index([status, assigneeRole])
+  @@map("approval_tasks")
+}
+
+model Notification {
+  id                String    @id @default(uuid()) @db.Uuid
+  /// 收件人一律用唯一编码
+  recipientUserCode String    @map("recipient_user_code") @db.VarChar(32)
+  category          String    @db.VarChar(48)
+  title             String    @db.VarChar(128)
+  body              String?   @db.VarChar(1000)
+  link              String?   @db.VarChar(255)
+  docType           String?   @map("doc_type") @db.VarChar(32)
+  docId             String?   @map("doc_id") @db.VarChar(64)
+  readAt            DateTime? @map("read_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+
+  @@index([recipientUserCode, readAt])
+  @@map("notifications")
+}
+
+// ============================================================
+// masterdata —— 客户档案（业务部模块 3；下单校验链的第一环）
+// ============================================================
+
+/// 国内客户必填税号，国外客户走报关资料口径
+enum CustomerRegion {
+  DOMESTIC
+  OVERSEAS
+
+  @@map("customer_region")
+}
+
+enum CustomerStatus {
+  /// 报价阶段的新客户：只有公司名、联系人、联系方式
+  DRAFT
+  /// 已提交完整档案待审
+  PENDING
+  ACTIVE
+  SUSPENDED
+
+  @@map("customer_status")
+}
+
+/// 付款条件三选一（业务规格 3.1）
+enum PaymentTerm {
+  /// ① 预付一定比例、剩余出货前付清
+  DEPOSIT_THEN_BALANCE
+  /// ② 现金，出货前全部付完
+  CASH_BEFORE_SHIPMENT
+  /// ③ 票到 30 / 60 / 90 天
+  NET_30
+  NET_60
+  NET_90
+
+  @@map("payment_term")
+}
+
+enum InvoiceType {
+  /// 普票
+  GENERAL
+  /// 专票
+  SPECIAL
+
+  @@map("invoice_type")
+}
+
+enum SettlementMethod {
+  CASH
+  NOTE
+
+  @@map("settlement_method")
+}
+
+model Customer {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// 客户编号由平台统一编号规则生成，不可手改
+  code      String         @unique @db.VarChar(32)
+  name      String         @db.VarChar(128)
+  shortName String         @map("short_name") @db.VarChar(64)
+  region    CustomerRegion
+  country   String         @db.VarChar(64)
+
+  /// 报关资料需要的英文名称与地址（模块 10）
+  englishName    String? @map("english_name") @db.VarChar(128)
+  englishAddress String? @map("english_address") @db.VarChar(255)
+
+  ownerName  String  @map("owner_name") @db.VarChar(64)
+  ownerPhone String  @map("owner_phone") @db.VarChar(64)
+  ownerEmail String? @map("owner_email") @db.VarChar(128)
+
+  /// 负责对接的业务人员：存唯一编码，驱动工作台数据权限
+  salesUserCode String? @map("sales_user_code") @db.VarChar(32)
+
+  /// 国内客户必填（服务层硬校验）
+  taxNo          String? @map("tax_no") @db.VarChar(64)
+  invoiceAddress String  @map("invoice_address") @db.VarChar(255)
+  bankAccount    String? @map("bank_account") @db.VarChar(64)
+  bankName       String? @map("bank_name") @db.VarChar(128)
+
+  paymentTerm PaymentTerm      @map("payment_term")
+  /// 付款条件①的预付比例，按万分比存整数避免浮点（3000 = 30%）
+  depositBps  Int?             @map("deposit_bps")
+  invoiceType InvoiceType      @map("invoice_type")
+  settlement  SettlementMethod
+  currency    String           @default("CNY") @db.VarChar(8)
+  tradeTerm   String?          @map("trade_term") @db.VarChar(64)
+  level       String?          @db.VarChar(32)
+
+  /// 香港 70% 价格：**独立权限点**，未授权者在列表/详情/报表/导出中一律看不到以下字段
+  hkPricingEnabled Boolean   @default(false) @map("hk_pricing_enabled")
+  /// 折算系数按万分比存整数（7000 = 70%），避免浮点
+  hkFactorBps      Int       @default(10000) @map("hk_factor_bps")
+  hkEffectiveFrom  DateTime? @map("hk_effective_from")
+  hkAppliedBy      String?   @map("hk_applied_by") @db.VarChar(32)
+  hkApprovedBy     String?   @map("hk_approved_by") @db.VarChar(32)
+  hkChangeReason   String?   @map("hk_change_reason") @db.VarChar(255)
+
+  status     CustomerStatus @default(DRAFT)
+  approvedBy String?        @map("approved_by") @db.VarChar(32)
+  approvedAt DateTime?      @map("approved_at")
+
+  /// 财务维护字段：业务角色只读，金额一律整数最小货币单位
+  creditLimitMinor    BigInt @default(0) @map("credit_limit_minor")
+  creditUsedMinor     BigInt @default(0) @map("credit_used_minor")
+  overdueAmountMinor  BigInt @default(0) @map("overdue_amount_minor")
+  arDays              Int    @default(0) @map("ar_days")
+
+  addresses       CustomerDeliveryAddress[]
+  changeRequests  CustomerChangeRequest[]
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  createdBy String?   @map("created_by") @db.VarChar(32)
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by") @db.VarChar(32)
+  deletedAt DateTime? @map("deleted_at")
+  version   Int       @default(0)
+
+  @@index([salesUserCode])
+  @@index([status])
+  @@map("customers")
+}
+
+/// 送货地址：最多 5 个，其中恰好一个为默认（服务层硬校验）
+model CustomerDeliveryAddress {
+  id         String  @id @default(uuid()) @db.Uuid
+  customerId String  @map("customer_id") @db.Uuid
+  label      String  @db.VarChar(64)
+  receiver   String  @db.VarChar(64)
+  phone      String  @db.VarChar(64)
+  address    String  @db.VarChar(255)
+  isDefault  Boolean @default(false) @map("is_default")
+  sortOrder  Int     @default(0) @map("sort_order")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([customerId])
+  @@map("customer_delivery_addresses")
+}
+
+/// 敏感字段（银行账号、付款条件、香港 70% 勾选等）变更申请：留痕并按权限审批后才生效
+model CustomerChangeRequest {
+  id         String        @id @default(uuid()) @db.Uuid
+  requestNo  String        @unique @map("request_no") @db.VarChar(32)
+  customerId String        @map("customer_id") @db.Uuid
+  /// 变更字段的前后值快照，键为字段名
+  changes    Json
+  reason     String        @db.VarChar(500)
+  status     RequestStatus @default(SUBMITTED)
+
+  submittedBy  String    @map("submitted_by") @db.VarChar(32)
+  submittedAt  DateTime  @default(now()) @map("submitted_at")
+  decidedBy    String?   @map("decided_by") @db.VarChar(32)
+  decidedAt    DateTime? @map("decided_at")
+  rejectReason String?   @map("reject_reason") @db.VarChar(500)
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  version   Int      @default(0)
+
+  @@index([customerId, status])
+  @@map("customer_change_requests")
+}
+
+// ============================================================
+// quotation —— 报价管理（业务部模块 2）
+// 成本分析格式以 example/成本分析/CNC成本分析.xls 为准，
+// 报价单格式以 example/报价单模板/ 两份文件为准。
+// ============================================================
+
+enum DrawingSource {
+  /// 报价环节上传，自动流转报价工程师（核价）与工程部（建 BOM）
+  QUOTATION
+  ECN
+  ENGINEERING
+
+  @@map("drawing_source")
+}
+
+enum CostAnalysisStatus {
+  DRAFT
+  /// 核价完成，可据此生成报价单
+  COMPLETED
+  /// 报价审核通过后锁版；改价一律生成新版本
+  LOCKED
+
+  @@map("cost_analysis_status")
+}
+
+enum QuotationStatus {
+  DRAFT
+  IN_REVIEW
+  EFFECTIVE
+  WON
+  LOST
+  EXPIRED
+
+  @@map("quotation_status")
+}
+
+enum QuoteChangeStatus {
+  SUBMITTED
+  /// 报价工程师重核成本分析并出新版本
+  REVISED
+  /// 驳回必须填理由
+  REJECTED
+
+  @@map("quote_change_status")
+}
+
+/// 原材料价格表：由授权岗位维护，成本分析带出材料单价并留痕
+model MaterialPrice {
+  id       String  @id @default(uuid()) @db.Uuid
+  /// 材质，如 AL6061-T6
+  material String  @db.VarChar(64)
+  /// 规格/形态，如 板料 / 型材 / 棒料
+  shape    String  @db.VarChar(32)
+  /// 单价，整数最小货币单位；单位为「元/KG」
+  unitPriceMinor BigInt @map("unit_price_minor")
+  currency String  @default("CNY") @db.VarChar(8)
+  /// 生效日期，取价时按「不晚于报价日期的最新一条」
+  effectiveFrom DateTime @map("effective_from")
+  source   String  @db.VarChar(64)
+  remark   String? @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.VarChar(32)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  version   Int      @default(0)
+
+  @@index([material, shape, effectiveFrom])
+  @@map("material_prices")
+}
+
+/// 当日汇率表：国外报价按当日汇率换算，并在报价版本上留快照
+model ExchangeRate {
+  id       String   @id @default(uuid()) @db.Uuid
+  base     String   @db.VarChar(8)
+  quote    String   @db.VarChar(8)
+  /// 汇率按百万分比存整数（7.1234 → 7123400），避免浮点
+  rateMicros BigInt @map("rate_micros")
+  quotedOn DateTime @map("quoted_on")
+  source   String   @default("MANUAL") @db.VarChar(32)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.VarChar(32)
+
+  @@unique([base, quote, quotedOn])
+  @@map("exchange_rates")
+}
+
+/// 图纸库：报价环节上传一次，报价工程师与工程部两处引用，版本递增
+model Drawing {
+  id         String  @id @default(uuid()) @db.Uuid
+  /// 名称图号
+  drawingNo  String  @map("drawing_no") @db.VarChar(64)
+  customerId String? @map("customer_id") @db.Uuid
+  title      String? @db.VarChar(128)
+
+  versions DrawingVersion[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.VarChar(32)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([drawingNo, customerId])
+  @@index([customerId])
+  @@map("drawings")
+}
+
+model DrawingVersion {
+  id        String        @id @default(uuid()) @db.Uuid
+  drawingId String        @map("drawing_id") @db.Uuid
+  /// 版本号，如 REV A / V2
+  revision  String        @db.VarChar(32)
+  sequence  Int
+  source    DrawingSource @default(QUOTATION)
+  /// 对象存储 key，下载走 docgen 的受控预签名 URL
+  fileKey   String        @map("file_key") @db.VarChar(255)
+  fileName  String        @map("file_name") @db.VarChar(255)
+  fileSize  Int           @map("file_size")
+  uploadedBy String       @map("uploaded_by") @db.VarChar(32)
+  uploadedAt DateTime     @default(now()) @map("uploaded_at")
+
+  drawing Drawing @relation(fields: [drawingId], references: [id], onDelete: Cascade)
+
+  @@unique([drawingId, sequence])
+  @@index([drawingId])
+  @@map("drawing_versions")
+}
+
+/// 成本分析表（仅报价工程师可建/改）
+model CostAnalysis {
+  id        String @id @default(uuid()) @db.Uuid
+  docNo     String @unique @map("doc_no") @db.VarChar(32)
+  /// 同一份核价的版本链：改价重核生成新版本，旧版本保留
+  version   Int    @default(1)
+  rootId    String? @map("root_id") @db.Uuid
+
+  customerId   String @map("customer_id") @db.Uuid
+  productModel String @map("product_model") @db.VarChar(128)
+
+  /// 损耗率与管理费利润率按万分比存整数（500 = 5%），默认各 5%、可调
+  lossBps      Int @default(500) @map("loss_bps")
+  overheadBps  Int @default(500) @map("overhead_bps")
+  /// 增值税率，默认 13%
+  vatBps       Int @default(1300) @map("vat_bps")
+  currency     String @default("CNY") @db.VarChar(8)
+
+  /// 工艺成本列的列定义（可自由加减），顺序即展示顺序
+  processColumns Json @map("process_columns")
+
+  status     CostAnalysisStatus @default(DRAFT)
+  preparedBy String             @map("prepared_by") @db.VarChar(32)
+  completedAt DateTime?         @map("completed_at")
+
+  lines      CostAnalysisLine[]
+  quotations Quotation[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.VarChar(32)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.VarChar(32)
+  versionLock Int    @default(0) @map("version_lock")
+
+  @@index([customerId])
+  @@index([rootId])
+  @@map("cost_analyses")
+}
+
+/// 成本分析明细：每个零件一行，列口径与 CNC成本分析.xls 逐列对应
+model CostAnalysisLine {
+  id             String @id @default(uuid()) @db.Uuid
+  costAnalysisId String @map("cost_analysis_id") @db.Uuid
+  sequence       Int
+
+  /// 毛料类型：板料 / 型材 / 棒料 等
+  blankType   String  @map("blank_type") @db.VarChar(32)
+  drawingNo   String  @map("drawing_no") @db.VarChar(128)
+  drawingVersionId String? @map("drawing_version_id") @db.Uuid
+  /// 规格型号（尺寸），如 115*106*19.04
+  spec        String  @db.VarChar(64)
+  revision    String? @db.VarChar(32)
+  quantity    Decimal @default(1) @db.Decimal(18, 6)
+  material    String  @db.VarChar(64)
+
+  /// 重量一律 Decimal，禁止浮点
+  estimatedWeightKg Decimal @map("estimated_weight_kg") @db.Decimal(18, 6)
+  netWeightKg       Decimal @map("net_weight_kg") @db.Decimal(18, 6)
+  scrapWeightKg     Decimal @map("scrap_weight_kg") @db.Decimal(18, 6)
+
+  /// 单价一律整数最小货币单位
+  scrapUnitPriceMinor    BigInt @default(0) @map("scrap_unit_price_minor")
+  materialUnitPriceMinor BigInt @map("material_unit_price_minor")
+  /// 材料单价是否手工改过（从价格表带出后可改，须留痕）
+  materialPriceOverridden Boolean @default(false) @map("material_price_overridden")
+  materialPriceSourceId   String? @map("material_price_source_id") @db.Uuid
+
+  /// 机加方式（CNC / 车床…）与加工时间（分钟）、加工金额
+  machiningMethod   String @map("machining_method") @db.VarChar(32)
+  machiningMinutes  Decimal @map("machining_minutes") @db.Decimal(18, 6)
+  machiningCostMinor BigInt @map("machining_cost_minor")
+
+  /// 各工艺列金额，键为 processColumns 里的列 key
+  processCosts Json @map("process_costs")
+
+  remark String? @db.VarChar(255)
+
+  costAnalysis CostAnalysis @relation(fields: [costAnalysisId], references: [id], onDelete: Cascade)
+
+  @@unique([costAnalysisId, sequence])
+  @@index([costAnalysisId])
+  @@map("cost_analysis_lines")
+}
+
+/// 报价单。强制关联成本分析与图纸，审核通过后锁版
+model Quotation {
+  id      String @id @default(uuid()) @db.Uuid
+  docNo   String @unique @map("doc_no") @db.VarChar(32)
+  version Int    @default(1)
+  rootId  String? @map("root_id") @db.Uuid
+
+  customerId String @map("customer_id") @db.Uuid
+  /// 硬校验：无成本分析不能创建、不能提交审核
+  costAnalysisId String @map("cost_analysis_id") @db.Uuid
+
+  /// 国内 / 国外两套模板
+  template String @default("DOMESTIC") @db.VarChar(16)
+  currency String @default("CNY") @db.VarChar(8)
+  /// 国外报价的当日汇率快照（百万分比整数），历史数据不随汇率表变动
+  fxRateMicros BigInt? @map("fx_rate_micros")
+  fxQuotedOn   DateTime? @map("fx_quoted_on")
+
+  /// 模具费单列，**不摊入单件价**
+  moldFeeMinor BigInt @default(0) @map("mold_fee_minor")
+
+  /// 报价单条款（国内模板：代工方式/付款方式/允许报废率/废料退还/有效期限）
+  terms Json?
+
+  status     QuotationStatus @default(DRAFT)
+  validUntil DateTime?       @map("valid_until")
+  submittedBy String?        @map("submitted_by") @db.VarChar(32)
+  submittedAt DateTime?      @map("submitted_at")
+  approvedBy  String?        @map("approved_by") @db.VarChar(32)
+  approvedAt  DateTime?      @map("approved_at")
+  rejectReason String?       @map("reject_reason") @db.VarChar(500)
+
+  costAnalysis   CostAnalysis          @relation(fields: [costAnalysisId], references: [id])
+  items          QuotationItem[]
+  changeRequests QuoteChangeRequest[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  createdBy String?  @map("created_by") @db.VarChar(32)
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by") @db.VarChar(32)
+  versionLock Int    @default(0) @map("version_lock")
+
+  @@index([customerId, status])
+  @@index([rootId])
+  @@map("quotations")
+}
+
+model QuotationItem {
+  id          String @id @default(uuid()) @db.Uuid
+  quotationId String @map("quotation_id") @db.Uuid
+  sequence    Int
+
+  /// 产品名称 / 名称图号 / 版本 / 材质 / 表面处理，对应两份模板的表头
+  productName String  @map("product_name") @db.VarChar(128)
+  drawingNo   String  @map("drawing_no") @db.VarChar(128)
+  drawingVersionId String? @map("drawing_version_id") @db.Uuid
+  revision    String? @db.VarChar(32)
+  material    String? @db.VarChar(64)
+  finishing   String? @db.VarChar(64)
+  process     String? @db.VarChar(64)
+  /// 关联的成本分析行，用于「低于成本价」比对
+  costAnalysisLineId String? @map("cost_analysis_line_id") @db.Uuid
+  remark      String? @db.VarChar(255)
+
+  tiers QuotationTier[]
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@unique([quotationId, sequence])
+  @@index([quotationId])
+  @@map("quotation_items")
+}
+
+/// 阶梯价：按数量段报价；非阶梯即只有一档
+model QuotationTier {
+  id     String @id @default(uuid()) @db.Uuid
+  itemId String @map("item_id") @db.Uuid
+  /// 起订量，如 10 / 100 / 1000
+  minQuantity Decimal @map("min_quantity") @db.Decimal(18, 6)
+  /// 业务员填入的最终报价（整数最小货币单位）
+  unitPriceMinor BigInt @map("unit_price_minor")
+  /// 该档对应的单件成本快照，用于「低于成本价」拦截与毛利回溯
+  unitCostMinor  BigInt @map("unit_cost_minor")
+  label String? @db.VarChar(32)
+
+  item QuotationItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, minQuantity])
+  @@index([itemId])
+  @@map("quotation_tiers")
+}
+
+/// 报价单修改申请：业务提改后价格 → 报价工程师改成本分析或驳回（驳回必填理由）
+model QuoteChangeRequest {
+  id          String @id @default(uuid()) @db.Uuid
+  requestNo   String @unique @map("request_no") @db.VarChar(32)
+  quotationId String @map("quotation_id") @db.Uuid
+
+  /// 业务希望改到的目标价（按产品行给出）
+  targetPrices Json   @map("target_prices")
+  reason       String @db.VarChar(500)
+
+  status       QuoteChangeStatus @default(SUBMITTED)
+  submittedBy  String            @map("submitted_by") @db.VarChar(32)
+  submittedAt  DateTime          @default(now()) @map("submitted_at")
+  handledBy    String?           @map("handled_by") @db.VarChar(32)
+  handledAt    DateTime?         @map("handled_at")
+  /// 驳回理由必填，且要回到业务员的工作台通知里
+  rejectReason String?           @map("reject_reason") @db.VarChar(500)
+  /// 重核后产生的新成本分析版本
+  revisedCostAnalysisId String?  @map("revised_cost_analysis_id") @db.Uuid
+
+  quotation Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  versionLock Int    @default(0) @map("version_lock")
+
+  @@index([quotationId, status])
+  @@map("quote_change_requests")
+}
