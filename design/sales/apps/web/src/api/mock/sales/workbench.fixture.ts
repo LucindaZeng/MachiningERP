@@ -1,0 +1,264 @@
+import type { AlertItem, TodoItem } from '@/types/sales.types'
+
+export interface KpiCard {
+  key: string
+  label: string
+  value: string
+  unit: string
+  trend: string
+  trendUp: boolean
+  hint: string
+}
+
+export interface ApprovalEfficiency {
+  node: string
+  median: string
+  p90: string
+  onTimeRate: number
+  returnRate: number
+  backlog: number
+}
+
+export const KPI_CARDS: KpiCard[] = [
+  {
+    key: 'order-amount',
+    label: '本月订单额',
+    value: '386.4',
+    unit: '万元',
+    trend: '+12.4%',
+    trendUp: true,
+    hint: '含三类订单，模具/样品按合同应收口径',
+  },
+  {
+    key: 'quote-conversion',
+    label: '报价转化率',
+    value: '41.2',
+    unit: '%',
+    trend: '+3.1pt',
+    trendUp: true,
+    hint: '近 90 天已确认报价 / 已发出报价',
+  },
+  {
+    key: 'gross-margin',
+    label: '订单毛利率',
+    value: '24.6',
+    unit: '%',
+    trend: '-1.8pt',
+    trendUp: false,
+    hint: '目标 26%，2 张订单低于阈值',
+  },
+  {
+    key: 'delivery-risk',
+    label: '交期风险订单',
+    value: '3',
+    unit: '张',
+    trend: '+1',
+    trendUp: false,
+    hint: 'PMC 预计完成晚于客户交期',
+  },
+  {
+    key: 'overdue-ar',
+    label: '逾期应收',
+    value: '12.68',
+    unit: '万元',
+    trend: '+12.68',
+    trendUp: false,
+    hint: '苏州明泰账期 90 天已逾期 11 天',
+  },
+  {
+    key: 'sample-conversion',
+    label: '样品转化率',
+    value: '57.1',
+    unit: '%',
+    trend: '+6.0pt',
+    trendUp: true,
+    hint: '近 6 个月样品订单转正式订单比例',
+  },
+]
+
+export const TODOS: TodoItem[] = [
+  {
+    id: 'T1',
+    category: '待送审报价',
+    title: '直线导轨安装座 · 毛利 15.2% 低于阈值，送审将触发会签',
+    docNo: 'QT-20260727-0042',
+    customer: '苏州明泰自动化',
+    dueAt: '2026-07-29 12:00',
+    level: 'due',
+    route: '/sales/quotations',
+  },
+  {
+    id: 'T2',
+    category: '报价即将失效',
+    title: '探头支架报价 7-30 到期，客户尚未确认',
+    docNo: 'QT-20260718-0026',
+    customer: 'Radex Instruments Inc.',
+    dueAt: '2026-07-30 18:00',
+    level: 'due',
+    route: '/sales/quotations',
+  },
+  {
+    id: 'T3',
+    category: '订单草稿滞留',
+    title: '免费样品订单已建 1.2 天未提交，费用承担方已填待送审',
+    docNo: 'SO-20260727-0118',
+    customer: '苏州明泰自动化',
+    dueAt: '2026-07-29 16:40',
+    level: 'due',
+    route: '/sales/orders',
+  },
+  {
+    id: 'T4',
+    category: '待发起订单评审',
+    title: '财务已批准，跨部门订单评审尚未发起',
+    docNo: 'SO-20260726-0113',
+    customer: '香港宏晟精密（代生产）',
+    dueAt: '2026-07-28 18:00',
+    level: 'info',
+    route: '/sales/orders',
+  },
+  {
+    id: 'T5',
+    category: '客户签收超期',
+    title: '模具已发货 3 天未回签收单，阻塞第二期开票',
+    docNo: 'SHP-20260724-0061',
+    customer: '香港宏晟精密（代生产）',
+    dueAt: '2026-07-27 18:00',
+    level: 'overdue',
+    route: '/sales/shipments',
+  },
+  {
+    id: 'T6',
+    category: '报关资料待补',
+    title: '缺唛头与港口代码，未齐套无法订舱',
+    docNo: 'EXP-20260727-0022',
+    customer: 'Radex Instruments Inc.',
+    dueAt: '2026-07-29 12:00',
+    level: 'overdue',
+    route: '/sales/customs',
+  },
+  {
+    id: 'T7',
+    category: '尾数待处理',
+    title: '探头支架尾数 14 件，已选返工补交待确认交期',
+    docNo: 'SHP-20260727-0064',
+    customer: 'Radex Instruments Inc.',
+    dueAt: '2026-08-03 18:00',
+    level: 'info',
+    route: '/sales/shipments',
+  },
+  {
+    id: 'T8',
+    category: '客诉待判定',
+    title: '阳极氧化色差，品质判定中，需跟进客户答复',
+    docNo: 'RMA-20260728-0010',
+    customer: 'Radex Instruments Inc.',
+    dueAt: '2026-07-30 08:50',
+    level: 'info',
+    route: '/sales/returns',
+  },
+  {
+    id: 'T9',
+    category: '待建客户主数据',
+    title: '东莞锐博客户资料待财务补充税务与信用后审批',
+    docNo: 'C-CN-018',
+    customer: '东莞市锐博机电设备',
+    dueAt: '2026-07-30 18:00',
+    level: 'info',
+    route: '/sales/customers',
+  },
+]
+
+export const ALERTS: AlertItem[] = [
+  {
+    id: 'A1',
+    level: 'blocking',
+    domain: '交付 / 报关',
+    subject: '报关资料未齐套，阻断订舱与发货',
+    triggerValue: '缺 2 项必填要素',
+    threshold: '发货前 48 小时须齐套',
+    occurredAt: '2026-07-27 16:00',
+    dueAt: '2026-07-29 12:00',
+    owner: '陈志强',
+    escalateTo: '业务经理 · 周敏',
+    relatedDocNo: 'EXP-20260727-0022',
+    suggestion: '补齐唛头与目的港代码后重新生成报关资料包并送关务复核',
+  },
+  {
+    id: 'A2',
+    level: 'overdue',
+    domain: '报价审批',
+    subject: '报价审批超期 7.5 小时',
+    triggerValue: '已耗时 31.5 小时',
+    threshold: 'SLA 24 小时',
+    occurredAt: '2026-07-28 09:00',
+    dueAt: '2026-07-28 09:00',
+    owner: '业务经理 · 周敏',
+    escalateTo: '总经办',
+    relatedDocNo: 'QT-20260722-0031',
+    suggestion: '毛利 22.3% 低于该客户目标 25%，需财务会签后批准或退回重新核价',
+  },
+  {
+    id: 'A3',
+    level: 'overdue',
+    domain: '交付',
+    subject: '客户签收单超期未回',
+    triggerValue: '已超期 21 小时',
+    threshold: '发货后 48 小时',
+    occurredAt: '2026-07-27 18:00',
+    dueAt: '2026-07-27 18:00',
+    owner: '罗晓琳',
+    escalateTo: '业务经理 · 周敏',
+    relatedDocNo: 'SHP-20260724-0061',
+    suggestion: '联系客户回传签收单，否则模具费第二期无法开票',
+  },
+  {
+    id: 'A4',
+    level: 'severe',
+    domain: '财务 / 信用',
+    subject: '客户信用占用率 98.1%，接近额度上限',
+    triggerValue: '58.84 万 / 60 万',
+    threshold: '预警线 90%',
+    occurredAt: '2026-07-27 08:00',
+    dueAt: '2026-07-31 18:00',
+    owner: '罗晓琳',
+    escalateTo: '财务部',
+    relatedDocNo: 'C-CN-004',
+    suggestion: '该客户已逾期 12.68 万，新订单提交财务审核将被阻断，先催收或申请临时额度',
+  },
+  {
+    id: 'A5',
+    level: 'due',
+    domain: '核价',
+    subject: '金属价格快照已过期 17 天',
+    triggerValue: '快照时间 2026-07-11',
+    threshold: '有效期 7 天',
+    occurredAt: '2026-07-27 12:45',
+    dueAt: '2026-07-29 12:00',
+    owner: '罗晓琳',
+    escalateTo: '业务经理 · 周敏',
+    relatedDocNo: 'QT-20260727-0042',
+    suggestion: '刷新 45# 圆钢行情后重新试算，价格变动超 3% 需重新核价',
+  },
+  {
+    id: 'A6',
+    level: 'info',
+    domain: '订单',
+    subject: '订单草稿滞留超过 1 天未提交',
+    triggerValue: '1.2 天',
+    threshold: '草稿允许滞留 1 天',
+    occurredAt: '2026-07-28 16:40',
+    dueAt: '2026-07-29 16:40',
+    owner: '罗晓琳',
+    escalateTo: '业务经理 · 周敏',
+    relatedDocNo: 'SO-20260727-0118',
+    suggestion: '免费样品订单需完成费用承担方、预计成本与原因后提交审批',
+  },
+]
+
+export const APPROVAL_EFFICIENCY: ApprovalEfficiency[] = [
+  { node: 'ORD-02 业务经理审核', median: '6.4h', p90: '18.2h', onTimeRate: 0.86, returnRate: 0.14, backlog: 1 },
+  { node: 'ORD-03 财务审核', median: '9.8h', p90: '22.6h', onTimeRate: 0.79, returnRate: 0.09, backlog: 1 },
+  { node: 'ORD-04 跨部门评审', median: '22.5h', p90: '41.0h', onTimeRate: 0.72, returnRate: 0.05, backlog: 0 },
+  { node: 'QTN-03 报价审批', median: '5.2h', p90: '31.5h', onTimeRate: 0.68, returnRate: 0.18, backlog: 2 },
+]

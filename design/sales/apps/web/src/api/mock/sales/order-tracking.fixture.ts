@@ -1,0 +1,232 @@
+import type { OrderTracking, TrackStage, TrackStageStatus } from '@/types/sales.types'
+
+/** 标准追踪路线：从订单评审开始，到成品入库结束（23 个环节） */
+export const TRACK_ROUTE: Array<{ phase: string; name: string; short: string; dept: string }> = [
+  { phase: '计划与采购', name: '订单评审', short: '订单评审', dept: '业务部 · 八部门会签' },
+  { phase: '计划与采购', name: 'PMC 跑生产计划', short: '生产计划', dept: 'PMC 部' },
+  { phase: '计划与采购', name: '采购计划', short: '采购计划', dept: '采购部' },
+  { phase: '来料与检验', name: '到料', short: '到料', dept: '仓储部' },
+  { phase: '来料与检验', name: '原材料品质检（IQC）', short: '来料检', dept: '品质部' },
+  { phase: '机加工', name: '切料', short: '切料', dept: '生产部' },
+  { phase: '机加工', name: '调机', short: '调机', dept: '生产部' },
+  { phase: '机加工', name: '首件检测', short: '首件检', dept: '品质部' },
+  { phase: '机加工', name: '车床', short: '车床', dept: '生产部 · 车床组' },
+  { phase: '机加工', name: '品质检（车床后）', short: '车后检', dept: '品质部 · 巡检' },
+  { phase: '机加工', name: 'CNC', short: 'CNC', dept: '生产部 · CNC 组' },
+  { phase: '机加工', name: '品质检（CNC 后）', short: 'CNC 检', dept: '品质部 · 巡检' },
+  { phase: '后处理与委外', name: '打磨', short: '打磨', dept: '后工序部' },
+  { phase: '后处理与委外', name: '品质检（打磨后）', short: '打磨检', dept: '品质部' },
+  { phase: '后处理与委外', name: '仓库（委外前入库）', short: '委外前仓', dept: '仓储部' },
+  { phase: '后处理与委外', name: '委外表面处理', short: '委外表处', dept: '委外 · 供应商' },
+  { phase: '后处理与委外', name: '仓库（委外回厂入库）', short: '回厂入仓', dept: '仓储部' },
+  { phase: '后处理与委外', name: '品质检（回厂检）', short: '回厂检', dept: '品质部 · IQC' },
+  { phase: '后处理与委外', name: '镭雕 / 丝印', short: '镭雕丝印', dept: '后工序部' },
+  { phase: '后处理与委外', name: '品质检（镭雕后）', short: '镭雕检', dept: '品质部' },
+  { phase: '交付入库', name: '包装', short: '包装', dept: '后工序部' },
+  { phase: '交付入库', name: '出货报告', short: '出货报告', dept: '品质部 / 业务部' },
+  { phase: '交付入库', name: '入库', short: '入库', dept: '仓储部' },
+]
+
+interface StageOverride {
+  plannedStart?: string
+  plannedEnd?: string
+  actualStart?: string
+  actualEnd?: string
+  qtyIn?: string
+  qtyOk?: string
+  qtyNg?: string
+  dwellHours?: number
+  remark?: string
+  status?: TrackStageStatus
+  progress?: number
+}
+
+/** 由「当前进行到第几个环节」生成完整环节列表，个别环节可用 overrides 补充实际数据 */
+function buildStages(
+  currentIndex: number,
+  quantity: string,
+  overrides: Record<number, StageOverride> = {},
+): TrackStage[] {
+  return TRACK_ROUTE.map((item, index) => {
+    const base: TrackStage = {
+      seq: index + 1,
+      phase: item.phase,
+      name: item.name,
+      shortName: item.short,
+      dept: item.dept,
+      status: index < currentIndex ? 'done' : index === currentIndex ? 'active' : 'pending',
+      qtyIn: index <= currentIndex ? quantity : undefined,
+      qtyOk: index < currentIndex ? quantity : undefined,
+    }
+    return { ...base, ...overrides[index + 1] }
+  })
+}
+
+export const ORDER_TRACKINGS: OrderTracking[] = [
+  {
+    id: 'TRK1',
+    orderNo: 'SO-20260710-0085',
+    customerName: 'Radex Instruments Inc.',
+    productName: '探头支架',
+    drawingNo: 'RX-3390',
+    orderType: 'formal',
+    quantity: '1500',
+    deliveryDate: '2026-08-08',
+    batchNo: 'B26071502',
+    currentStage: '包装',
+    doneCount: 20,
+    totalCount: 23,
+    risk: 'due',
+    riskNote: '报关资料未齐套，若 7-29 前未补齐将影响 8-08 交期',
+    updatedAt: '2026-07-28 15:20',
+    stages: buildStages(20, '1500', {
+      1: { actualStart: '2026-07-10 14:05', actualEnd: '2026-07-12 09:30', dwellHours: 43.4 },
+      2: { actualStart: '2026-07-12 09:30', actualEnd: '2026-07-12 17:00', dwellHours: 7.5 },
+      3: { actualStart: '2026-07-12 17:00', actualEnd: '2026-07-13 11:20', dwellHours: 18.3 },
+      4: { actualStart: '2026-07-16 08:30', actualEnd: '2026-07-16 10:00', dwellHours: 1.5, remark: '7075-T651 板料到货 380kg' },
+      5: { actualStart: '2026-07-16 10:00', actualEnd: '2026-07-16 15:40', dwellHours: 5.7, qtyOk: '1500', remark: 'IQC 合格，材质单与炉号已归档' },
+      6: { actualStart: '2026-07-17 08:00', actualEnd: '2026-07-17 16:30', dwellHours: 8.5 },
+      7: { actualStart: '2026-07-18 08:00', actualEnd: '2026-07-18 11:20', dwellHours: 3.3 },
+      8: { actualStart: '2026-07-18 11:20', actualEnd: '2026-07-18 13:00', dwellHours: 1.7, qtyIn: '3', qtyOk: '3', remark: '首件三坐标合格，放行批量' },
+      9: { actualStart: '2026-07-18 13:00', actualEnd: '2026-07-20 17:00', dwellHours: 52 },
+      10: { actualStart: '2026-07-20 17:00', actualEnd: '2026-07-20 19:10', dwellHours: 2.2, qtyOk: '1496', qtyNg: '4' },
+      11: { actualStart: '2026-07-21 08:00', actualEnd: '2026-07-24 16:00', dwellHours: 80, qtyIn: '1496' },
+      12: { actualStart: '2026-07-24 16:00', actualEnd: '2026-07-24 18:30', dwellHours: 2.5, qtyIn: '1496', qtyOk: '1490', qtyNg: '6' },
+      13: { actualStart: '2026-07-25 08:00', actualEnd: '2026-07-25 15:00', dwellHours: 7, qtyIn: '1490', qtyOk: '1490' },
+      14: { actualStart: '2026-07-25 15:00', actualEnd: '2026-07-25 16:20', dwellHours: 1.3, qtyIn: '1490', qtyOk: '1488', qtyNg: '2' },
+      15: { actualStart: '2026-07-25 16:20', actualEnd: '2026-07-25 17:40', dwellHours: 1.3, qtyIn: '1488', qtyOk: '1488' },
+      16: { actualStart: '2026-07-26 09:00', actualEnd: '2026-07-27 10:00', dwellHours: 25, qtyIn: '1488', qtyOk: '1488', remark: '硬质阳极氧化，供应商：东莞华表' },
+      17: { actualStart: '2026-07-27 10:00', actualEnd: '2026-07-27 11:00', dwellHours: 1, qtyIn: '1488', qtyOk: '1488' },
+      18: { actualStart: '2026-07-27 11:00', actualEnd: '2026-07-27 14:00', dwellHours: 3, qtyIn: '1488', qtyOk: '1486', qtyNg: '2', remark: '2 件色差判退，已开 RMA-20260728-0010 追溯' },
+      19: { actualStart: '2026-07-27 14:00', actualEnd: '2026-07-27 17:30', dwellHours: 3.5, qtyIn: '1486', qtyOk: '1486' },
+      20: { actualStart: '2026-07-27 17:30', actualEnd: '2026-07-27 18:40', dwellHours: 1.2, qtyIn: '1486', qtyOk: '1486' },
+      21: { status: 'active', progress: 60, actualStart: '2026-07-28 08:00', qtyIn: '1486', qtyOk: '892', dwellHours: 7.3, remark: '包装中，尾数 14 件走返工补交' },
+      22: { plannedStart: '2026-07-29 09:00' },
+      23: { plannedStart: '2026-07-29 14:00' },
+    }),
+  },
+  {
+    id: 'TRK2',
+    orderNo: 'SO-20260720-0101',
+    customerName: 'Brenner Maschinenbau GmbH',
+    productName: '液压阀体',
+    drawingNo: 'BR-2208',
+    orderType: 'formal',
+    quantity: '1000',
+    deliveryDate: '2026-09-05',
+    batchNo: 'B26072801',
+    currentStage: 'CNC',
+    doneCount: 10,
+    totalCount: 23,
+    risk: 'normal',
+    updatedAt: '2026-07-28 16:40',
+    stages: buildStages(10, '1000', {
+      1: { actualStart: '2026-07-20 09:40', actualEnd: '2026-07-21 16:00', dwellHours: 30.3 },
+      2: { actualStart: '2026-07-21 16:00', actualEnd: '2026-07-22 09:00', dwellHours: 17 },
+      3: { actualStart: '2026-07-22 09:00', actualEnd: '2026-07-22 15:30', dwellHours: 6.5, remark: '304 不锈钢棒料，供应商已确认 7-25 到货' },
+      4: { actualStart: '2026-07-25 09:00', actualEnd: '2026-07-25 10:30', dwellHours: 1.5 },
+      5: { actualStart: '2026-07-25 10:30', actualEnd: '2026-07-25 16:00', dwellHours: 5.5, qtyOk: '1000' },
+      6: { actualStart: '2026-07-26 08:00', actualEnd: '2026-07-26 18:00', dwellHours: 10 },
+      7: { actualStart: '2026-07-27 08:00', actualEnd: '2026-07-27 10:40', dwellHours: 2.7 },
+      8: { actualStart: '2026-07-27 10:40', actualEnd: '2026-07-27 12:00', dwellHours: 1.3, qtyIn: '3', qtyOk: '3' },
+      9: { actualStart: '2026-07-27 13:00', actualEnd: '2026-07-28 11:00', dwellHours: 22 },
+      10: { actualStart: '2026-07-28 11:00', actualEnd: '2026-07-28 12:30', dwellHours: 1.5, qtyOk: '998', qtyNg: '2' },
+      11: { status: 'active', progress: 35, actualStart: '2026-07-28 13:30', qtyIn: '998', qtyOk: '349', dwellHours: 3.2, remark: '四轴加工中，预计 7-31 完成' },
+    }),
+  },
+  {
+    id: 'TRK3',
+    orderNo: 'SO-20260726-0113',
+    customerName: '香港宏晟精密（代生产）',
+    productName: '连接器外壳 CNC 件',
+    drawingNo: 'HS-4471-A',
+    orderType: 'formal',
+    quantity: '5000',
+    deliveryDate: '2026-08-22',
+    batchNo: '待分配',
+    currentStage: '订单评审',
+    doneCount: 0,
+    totalCount: 23,
+    risk: 'due',
+    riskNote: 'ECN-20260727-0018 改图待评估，评审通过前不排产',
+    updatedAt: '2026-07-28 09:12',
+    stages: buildStages(0, '5000', {
+      1: {
+        status: 'blocked',
+        progress: 50,
+        actualStart: '2026-07-27 09:12',
+        dwellHours: 31.6,
+        remark: '财务已批准，跨部门评审未发起；且存在改图 ECN 待工程评估',
+      },
+    }),
+  },
+  {
+    id: 'TRK4',
+    orderNo: 'SO-20260715-0092',
+    customerName: '香港宏晟精密（代生产）',
+    productName: '连接器外壳成型模具',
+    drawingNo: 'HS-4471-M1',
+    orderType: 'mold',
+    quantity: '1',
+    deliveryDate: '2026-08-30',
+    batchNo: 'B26072401',
+    currentStage: '入库',
+    doneCount: 23,
+    totalCount: 23,
+    risk: 'normal',
+    riskNote: '已完工发货，等待客户签收回单',
+    updatedAt: '2026-07-25 11:00',
+    stages: buildStages(23, '1', {
+      23: { status: 'done', actualEnd: '2026-07-24 16:40', qtyOk: '1', remark: '模具入库并已发货 SHP-20260724-0061' },
+    }),
+  },
+  {
+    id: 'TRK5',
+    orderNo: 'SP-20260722-0031',
+    customerName: '苏州明泰自动化',
+    productName: '定位销座（改款样品）',
+    drawingNo: 'MT-7420-B',
+    orderType: 'sample',
+    quantity: '20',
+    deliveryDate: '2026-08-05',
+    batchNo: 'S26072201',
+    currentStage: '车床',
+    doneCount: 8,
+    totalCount: 23,
+    risk: 'normal',
+    riskNote: '样品订单不建 BOM，按客户图纸编制临时工艺路线，转量产时才提 BOM 申请',
+    updatedAt: '2026-07-28 14:10',
+    stages: buildStages(8, '20', {
+      1: { actualStart: '2026-07-22 10:00', actualEnd: '2026-07-22 15:00', dwellHours: 5, remark: '样品订单免 BOM，免程序确认走临时工艺路线' },
+      2: { actualStart: '2026-07-22 15:00', actualEnd: '2026-07-22 17:30', dwellHours: 2.5 },
+      3: { actualStart: '2026-07-23 08:30', actualEnd: '2026-07-23 11:00', dwellHours: 2.5 },
+      4: { actualStart: '2026-07-24 09:00', actualEnd: '2026-07-24 10:00', dwellHours: 1 },
+      5: { actualStart: '2026-07-24 10:00', actualEnd: '2026-07-24 13:00', dwellHours: 3, qtyOk: '20' },
+      6: { actualStart: '2026-07-25 08:00', actualEnd: '2026-07-25 10:30', dwellHours: 2.5 },
+      7: { actualStart: '2026-07-27 08:00', actualEnd: '2026-07-27 09:40', dwellHours: 1.7 },
+      8: { actualStart: '2026-07-27 09:40', actualEnd: '2026-07-27 11:00', dwellHours: 1.3, qtyIn: '2', qtyOk: '2' },
+      9: { status: 'active', progress: 80, actualStart: '2026-07-28 08:00', qtyIn: '20', qtyOk: '16', dwellHours: 6.2 },
+    }),
+  },
+  {
+    id: 'TRK6',
+    orderNo: 'STK-20260706-0004',
+    customerName: '（备料 · 无客户交货）',
+    productName: '连接器底座',
+    drawingNo: 'HS-4102-B',
+    orderType: 'stock',
+    quantity: '2000',
+    deliveryDate: '2026-08-12',
+    batchNo: 'K26070601',
+    currentStage: '仓库（委外前入库）',
+    doneCount: 14,
+    totalCount: 23,
+    risk: 'normal',
+    riskNote: '备料订单不向客户交货，全部入库即视为完成；交期为内部完工目标日',
+    updatedAt: '2026-07-28 17:05',
+    stages: buildStages(14, '2000', {
+      1: { actualStart: '2026-07-06 09:20', actualEnd: '2026-07-07 16:40', dwellHours: 31.3, remark: '总经办审批占用资金 31.3 小时，超 24 小时 SLA' },
+      15: { status: 'active', progress: 55, actualStart: '2026-07-28 09:00', qtyIn: '1240', qtyOk: '682', dwellHours: 8.1, remark: '陆续入库中，已入库 1100 件' },
+    }),
+  },
+]

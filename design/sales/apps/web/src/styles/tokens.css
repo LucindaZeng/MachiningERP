@@ -1,0 +1,41 @@
+/**
+ * 品牌设计令牌：取色自东莞市万富鑫智能装备有限公司 VI
+ * 主色 #0B357B（深蓝）、辅色 #DF911E（金橙）
+ */
+:root {
+  --wfx-navy: #0b357b;
+  --wfx-navy-deep: #072451;
+  --wfx-navy-soft: #123f8f;
+  --wfx-orange: #df911e;
+  --wfx-orange-soft: #f2b455;
+
+  --wfx-text-strong: #17233d;
+  --wfx-text: #3d4b66;
+  --wfx-text-muted: #8a93a6;
+  --wfx-border: #dfe4ed;
+  --wfx-surface: #ffffff;
+  --wfx-surface-alt: #f4f7fc;
+
+  /* 图表分类色：已用 dataviz 校验器验证（浅色面上 CVD ΔE 8.8 / 常规视觉 ΔE 21.5 通过），
+     对比度低于 3:1 的两档按「relief 规则」全部配直接数值标签与表格视图 */
+  --viz-series-1: #1f5bb5;
+  --viz-series-2: #df911e;
+  --viz-series-3: #1baf7a;
+  --viz-grid: #e8ecf3;
+  --viz-axis: #97a0b0;
+
+  --wfx-radius-lg: 16px;
+  --wfx-radius-md: 10px;
+  --wfx-shadow-card: 0 24px 60px rgba(7, 36, 81, 0.28);
+
+  /* Element Plus 主题对齐品牌色 */
+  --el-color-primary: #0b357b;
+  --el-color-primary-dark-2: #092a62;
+  --el-color-primary-light-3: #5472a3;
+  --el-color-primary-light-5: #859abd;
+  --el-color-primary-light-7: #b6c2d7;
+  --el-color-primary-light-8: #ced7e5;
+  --el-color-primary-light-9: #e7ebf2;
+  --el-border-radius-base: 8px;
+  --el-font-size-base: 14px;
+}
