@@ -6,7 +6,7 @@
 
 ```
 apps/
-  web/          # 内部十部门前端（Vue 3）
+  web/          # 内部十三部门前端（Vue 3）
   portal/       # 客户/供应商门户前端（独立账号体系）
 services/
   api/          # 核心后端（NestJS 模块化单体）
@@ -17,7 +17,7 @@ packages/
   shared/       # 类型、DTO、枚举、错误码（前后端共享）
   ui/           # 内部组件库（表格、单据、扫码组件）
 infra/          # docker-compose、K3s manifests、数据库迁移脚本
-tests/          # e2e 与验收场景脚本（对应 V2.1 端到端验收场景）
+tests/          # e2e 与验收场景脚本（对应 V2.2 端到端验收场景）
 docs/           # 本目录
 tools/          # 文档/方案生成脚本
 ```

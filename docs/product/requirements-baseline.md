@@ -1,13 +1,13 @@
 # 需求基线与 Epic 映射
 
-详细字段、流程、规则和验收证据见 [Word 规划方案](../制造业ERP软件规划方案_V2.1.docx)。十部门的功能、审核权限、预警和报表见 [部门控制矩阵](department-control-matrix.md)，订单节点及模具/样品/正式订单收费规则见 [订单全生命周期](../workflows/order-to-pack-lifecycle.md)，返工拆单与责任成本规则见 [返工成本归集](../workflows/rework-cost-accounting.md)，香港客户正式订单价格换算见 [香港客户价格规则](../workflows/hong-kong-manufacturing-orders.md)，每道工艺独立成本规则见 [工序级成本](../features/operation-level-costing.md)。本文件用于把需求分解到 GitHub Issue、实现和测试。
+详细字段、流程、规则和验收证据见 [Word 规划方案](../制造业ERP软件规划方案_V2.3.docx)。十三部门的功能、审核权限、预警和报表见 [部门控制矩阵](department-control-matrix.md)，订单节点及模具/样品/正式订单收费规则见 [订单全生命周期](../workflows/order-to-pack-lifecycle.md)，返工拆单与责任成本规则见 [返工成本归集](../workflows/rework-cost-accounting.md)，香港客户正式订单价格换算见 [香港客户价格规则](../workflows/hong-kong-manufacturing-orders.md)，每道工艺独立成本规则见 [工序级成本](../features/operation-level-costing.md)。本文件用于把需求分解到 GitHub Issue、实现和测试。
 
 ## Epic
 
 | Epic | 需求前缀 | 范围 | 首要验收 |
 | --- | --- | --- | --- |
 | 项目治理 | GOV | 范围、RACI、变更、风险、上线与回退 | 阶段门和真实业务 UAT |
-| 组织与部门 | ORG | 十部门、岗位、工作中心、数据责任和权限 | 十部门工作台及跨部门交接UAT |
+| 组织与部门 | ORG | 十三部门、岗位、工作中心、数据责任和权限 | 十三部门工作台及跨部门交接UAT |
 | 订单全生命周期 | OTL | 报价、工程准备、订单审核、评审、MRP、采购、生产、品质、委外、包装与节点时效 | T0至T1逐节点计时、预警和数量交接UAT |
 | 主数据与工程 | MDM | 物料、图纸、BOM、工艺、设备、工装和版本 | 工单使用唯一有效版本 |
 | 报价与合同 | QTN | 询价、成本、报价、审批、合同和订单 | 系统生成报价 PDF 并转订单 |

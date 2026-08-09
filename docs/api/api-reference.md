@@ -4,11 +4,20 @@
 
 ## auth / identity / org
 
+> 本段已在 `services/api` 落地，实现细节见 [services/api/README.md](../../services/api/README.md)。标 ✅ 的为已上线端点。
+
 | 端点 | 说明 |
 | --- | --- |
-| POST /auth/login · /auth/refresh · /auth/logout | 登录、续签、注销（门户独立域） |
+| ✅ GET /auth/captcha | 图形验证码挑战；连续登录失败 3 次后必填，8 次临时锁定 |
+| ✅ POST /auth/login · /auth/logout | 登录签发 JWT、注销即撤销（门户独立账号域，token 内含 audience） |
+| ✅ GET /auth/me | 当前用户与权限点集合；前端不再自行推导权限 |
+| ✅ POST /auth/account-availability | 登录页「申请账户」的用户名可用性校验；离职释放的用户名可重新登记并提示原使用人 |
+| ✅ POST /auth/account-requests | 提交账户申请；**注册即发放唯一编码**，终身不变、永不复用 |
+| ✅ POST /auth/password-reset-requests | 忘记密码：派单给 IT 系统管理员重置，不发邮件/短信重置链接 |
+| POST /auth/refresh | 续签（待实现） |
 | GET/POST/PUT /users, /roles, /permissions | 用户与 RBAC；数据权限规则 `/data-scopes` |
-| GET/POST /departments, /work-centers, /shift-calendars | 十部门、工作中心、班次日历 |
+| ✅ GET /departments | 十三部门清单（申请账户的部门下拉需要，未登录可读） |
+| POST/PUT /departments, /work-centers, /shift-calendars | 组织维护、工作中心、班次日历（待实现） |
 
 ## masterdata（主数据与工程）
 

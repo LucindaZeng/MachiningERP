@@ -2,10 +2,11 @@
 
 ## 规划基线
 
-- [制造业 ERP 软件规划方案 V2.1](制造业ERP软件规划方案_V2.1.docx)：选型、RFP、实施范围和验收的详细基线（V2.1 增补尾数返工与入库、长时间工单未完结监控、架机表、中途改工序、平衡化生产和 DeepSeek V4 Pro 选型）。
+- [制造业 ERP 软件规划方案 V2.3](制造业ERP软件规划方案_V2.3.docx)：选型、RFP、实施范围和验收的详细基线（V2.3 增补订单四分类——新增备料订单总经办审批与加权成本结转，及客户对账单功能；V2.2 增补13部门蓝图与「模块开发顺序」章节）。
 - [产品范围](product/vision-and-scope.md)：目标、角色、系统边界和不在当前范围内的事项。
-- [十部门组织与应用蓝图](product/department-operating-model.md)：工作台、数据归属、权限、流程和交接。
-- [十部门功能、权限、预警与报表矩阵](product/department-control-matrix.md)：逐部门功能、审批边界、预警和系统报表详细清单。
+- [十三部门组织与应用蓝图](product/department-operating-model.md)：工作台、数据归属、权限、流程和交接。
+- [十三部门功能、权限、预警与报表矩阵](product/department-control-matrix.md)：逐部门功能、审批边界、预警和系统报表详细清单。
+- [业务部模块需求规格](product/business-department-modules.md)：11个模块——工作台、报价（成本分析/修改申请）、订单（四类+订单追踪）、客户、BOM/ECN、出货退货、发票申请、报关与数据分析。
 - [需求基线](product/requirements-baseline.md)：Epic、需求编号与研发交付映射。
 - [路线图](roadmap.md)：从需求确认到试点上线的阶段门。
 - [术语表](glossary.md)：跨部门统一业务语言。
