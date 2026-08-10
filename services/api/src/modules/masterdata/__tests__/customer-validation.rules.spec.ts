@@ -123,36 +123,3 @@ describe('送货地址：最多 5 个且恰好一个默认', () => {
     expect(fields).toContain('addresses[0].address')
   })
 })
-
-describe('香港 70% 价格勾选', () => {
-  const hk = { ...DOMESTIC, hkPricingEnabled: true, hkFactorBps: 7000 }
-
-  it('勾选时必须给生效日期与变更理由（审计要求）', () => {
-    const fields = fieldsOf(hk)
-    expect(fields).toContain('hkEffectiveFrom')
-    expect(fields).toContain('hkChangeReason')
-  })
-
-  it('齐全时通过', () => {
-    expect(
-      validateCustomerProfile({
-        ...hk,
-        hkEffectiveFrom: '2026-01-01',
-        hkChangeReason: '香港代生产协议续签',
-      }),
-    ).toEqual([])
-  })
-
-  it('系数必须在 0% 与 100% 之间', () => {
-    const full = { ...hk, hkEffectiveFrom: '2026-01-01', hkChangeReason: '协议' }
-    expect(fieldsOf({ ...full, hkFactorBps: 0 })).toContain('hkFactorBps')
-    expect(fieldsOf({ ...full, hkFactorBps: 10_001 })).toContain('hkFactorBps')
-    expect(fieldsOf({ ...full, hkFactorBps: null })).toContain('hkFactorBps')
-    // 100% 是合法的（等于不打折）
-    expect(validateCustomerProfile({ ...full, hkFactorBps: 10_000 })).toEqual([])
-  })
-
-  it('未勾选时不校验香港相关字段', () => {
-    expect(validateCustomerProfile({ ...DOMESTIC, hkPricingEnabled: false })).toEqual([])
-  })
-})

@@ -49,11 +49,6 @@ export class CreateCustomerDto {
   @IsOptional() @IsString() @MaxLength(64) tradeTerm?: string
   @IsOptional() @IsString() @MaxLength(32) level?: string
 
-  @IsOptional() @IsBoolean() hkPricingEnabled?: boolean
-  @IsOptional() @IsInt() hkFactorBps?: number
-  @IsOptional() @IsString() @MaxLength(32) hkEffectiveFrom?: string
-  @IsOptional() @IsString() @MaxLength(255) hkChangeReason?: string
-
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => DeliveryAddressDto)

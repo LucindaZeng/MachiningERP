@@ -12,8 +12,6 @@ export const SENSITIVE_CUSTOMER_FIELDS = [
   'depositBps',
   'invoiceType',
   'settlement',
-  'hkPricingEnabled',
-  'hkFactorBps',
 ] as const
 
 export type SensitiveCustomerField = (typeof SENSITIVE_CUSTOMER_FIELDS)[number]
@@ -26,8 +24,6 @@ const SENSITIVE_LABELS: Record<SensitiveCustomerField, string> = {
   depositBps: '预付比例',
   invoiceType: '发票种类',
   settlement: '结算方式',
-  hkPricingEnabled: '香港 70% 价格勾选',
-  hkFactorBps: '香港价格系数',
 }
 
 export function isSensitiveField(field: string): field is SensitiveCustomerField {

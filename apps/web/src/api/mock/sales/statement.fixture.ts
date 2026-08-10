@@ -139,7 +139,7 @@ export const STATEMENTS: Statement[] = [
         docNo: 'RCP-26-0320',
         amount: '-58400.00',
         matched: true,
-        remark: '按 70% 计价口径结算，月结 60 天内到账',
+        remark: '按订单确认单价结算，月结 60 天内到账',
       },
     ],
   },

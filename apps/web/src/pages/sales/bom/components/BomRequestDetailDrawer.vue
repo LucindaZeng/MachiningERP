@@ -3,6 +3,8 @@ import { CircleCheckFilled, Clock } from '@element-plus/icons-vue'
 import { computed } from 'vue'
 
 import DocTimeline from '@/components/DocTimeline.vue'
+import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
+import { useFilePreview } from '@/composables/use-file-preview'
 
 import type { BomRequest } from '@/types/sales.types'
 
@@ -13,6 +15,13 @@ const visible = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit('update:modelValue', value),
 })
+
+const filePreview = useFilePreview()
+
+/** 图纸沿用报价环节上传的那一版，这里只按版本主键调平台预览能力 */
+function previewDrawing(versionId: string): void {
+  void filePreview.open('drawing-version', versionId)
+}
 
 /** 正式量产建「品号」，模具建「模具编号」 */
 function codeLabel(row: BomRequest): string {
@@ -77,6 +86,15 @@ const orderable = computed(() => props.request?.bomReady && props.request?.progr
         <el-descriptions-item label="产品">{{ request.productName }}</el-descriptions-item>
         <el-descriptions-item label="图号 / 版本">
           {{ request.drawingNo }} · {{ request.drawingVersion }}
+          <el-button
+            v-if="request.drawingVersionId"
+            link
+            type="primary"
+            class="preview-link"
+            @click="previewDrawing(request.drawingVersionId)"
+          >
+            预览图纸
+          </el-button>
         </el-descriptions-item>
         <el-descriptions-item label="材料">{{ request.material }}</el-descriptions-item>
         <el-descriptions-item label="表面处理">{{ request.surfaceTreatment }}</el-descriptions-item>
@@ -112,9 +130,23 @@ const orderable = computed(() => props.request?.bomReady && props.request?.progr
       </template>
     </template>
   </el-drawer>
+
+    <FilePreviewDialog
+      v-model="filePreview.visible.value"
+      :loading="filePreview.loading.value"
+      :preview="filePreview.preview.value"
+      :unsupported="filePreview.unsupported.value"
+      :error-message="filePreview.errorMessage.value"
+      @close="filePreview.close"
+      @download="filePreview.download"
+    />
 </template>
 
 <style scoped>
+.preview-link {
+  margin-left: 8px;
+}
+
 .item-code {
   font-size: 12.5px;
   font-weight: 600;

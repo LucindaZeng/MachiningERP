@@ -1,22 +1,10 @@
 import { request } from '../http'
 
-import type { HkPricing, OrderChangeRequest, OrderType, SalesOrder } from '@/types/sales.types'
-
-export interface HkCalculateInput {
-  customerCode: string
-  orderType: OrderType
-  originalUnitPrice: string
-  quantity: string
-}
+import type { OrderChangeRequest, SalesOrder } from '@/types/sales.types'
 
 /** GET /sales-orders —— 业务订单列表（ORD-01~04） */
 export function fetchSalesOrders(): Promise<SalesOrder[]> {
   return request<SalesOrder[]>({ method: 'GET', url: '/sales-orders' })
-}
-
-/** POST /hk-pricing/calculate —— 香港客户 70% 价格试算与适用性校验 */
-export function calculateHkPrice(input: HkCalculateInput): Promise<HkPricing> {
-  return request<HkPricing>({ method: 'POST', url: '/hk-pricing/calculate', body: input })
 }
 
 /** POST /sales-orders —— 建单并提交业务经理审核（T0 起算） */

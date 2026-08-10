@@ -8,7 +8,7 @@ import { BizError } from '../../../common/errors/biz-error'
 import type { Request } from 'express'
 
 /**
- * 权限点校验。香港 70% 价格、成本核算等都是独立权限点，
+ * 权限点校验。成本核算、客户财务字段等都是独立权限点，
  * 未授予者一律拒绝——字段级隐藏另由序列化层裁剪。
  */
 @Injectable()

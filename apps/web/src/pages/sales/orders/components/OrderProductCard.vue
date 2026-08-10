@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Delete, Plus, UploadFilled } from '@element-plus/icons-vue'
-import { computed } from 'vue'
+import { UPLOAD_ACCEPT_ATTRIBUTE } from '@machining-erp/shared'
+import { computed, ref } from 'vue'
+
 
 import type { OrderLine } from '@/types/sales.types'
 
@@ -12,6 +14,9 @@ const props = defineProps<{
   currency: string
   poFile: string
   needPoFile: boolean
+  poUploading: boolean
+  poPercent: number
+  poError: string
   isFormal: boolean
   isSample: boolean
   isStock: boolean
@@ -20,8 +25,18 @@ const props = defineProps<{
 const emit = defineEmits<{
   'add-line': []
   'remove-line': [number]
-  'pick-po-file': []
+  'pick-po-file': [File]
+  'clear-po-file': []
 }>()
+
+const poInput = ref<HTMLInputElement>()
+
+function onPoPicked(event: Event): void {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (file) emit('pick-po-file', file)
+}
 
 const deliveryDate = defineModel<string>('deliveryDate', { required: true })
 const customerPoNo = defineModel<string>('customerPoNo', { required: true })
@@ -149,12 +164,41 @@ const bomPlaceholder = computed(() => {
       <el-col :span="12">
         <el-form-item label="客户订单原件">
           <div class="po">
-            <el-button size="small" :icon="UploadFilled" @click="emit('pick-po-file')">上传原件</el-button>
-            <span v-if="poFile" class="po__file">{{ poFile }}</span>
+            <input
+              ref="poInput"
+              type="file"
+              class="po__input"
+              :accept="UPLOAD_ACCEPT_ATTRIBUTE"
+              @change="onPoPicked"
+            />
+            <el-button
+              size="small"
+              :icon="UploadFilled"
+              :loading="poUploading"
+              @click="poInput?.click()"
+            >
+              {{ poFile ? '重新上传' : '上传原件' }}
+            </el-button>
+
+            <el-progress
+              v-if="poUploading"
+              class="po__progress"
+              :percentage="poPercent"
+              :stroke-width="12"
+              striped
+              striped-flow
+            />
+            <template v-else-if="poFile">
+              <span class="po__file">{{ poFile }}</span>
+              <el-button link type="danger" size="small" @click="emit('clear-po-file')">
+                移除
+              </el-button>
+            </template>
             <span v-else :class="needPoFile ? 'po__required' : 'po__optional'">
               {{ needPoFile ? '本类型订单强制上传客户订单原件' : '免费样品可不上传' }}
             </span>
           </div>
+          <span v-if="poError" class="po__error">{{ poError }}</span>
         </el-form-item>
       </el-col>
       <el-col :span="12">
@@ -201,6 +245,22 @@ const bomPlaceholder = computed(() => {
 </template>
 
 <style scoped>
+.po__input {
+  display: none;
+}
+
+.po__progress {
+  flex: 1 1 180px;
+  min-width: 160px;
+}
+
+.po__error {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-color-danger);
+}
+
 .card-title {
   font-size: 14px;
   font-weight: 700;

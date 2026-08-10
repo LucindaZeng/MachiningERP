@@ -97,4 +97,10 @@ export interface InvoiceRequest {
   owner: string
   submittedAt: string
   timeline: TimelineNode[]
+  /** 正票还是红字发票；红字发票金额为负，与正票同列显示 */
+  kind?: 'invoice' | 'credit-note'
+  /** 红字发票指向的原票号 */
+  originalDocNo?: string
+  /** 作废或红冲的理由 */
+  voidReason?: string
 }

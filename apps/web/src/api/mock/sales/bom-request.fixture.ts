@@ -15,6 +15,7 @@ export const BOM_REQUESTS: BomRequest[] = [
     customerPoNo: 'MT-PO-2607119',
     productName: '直线导轨安装座',
     drawingNo: 'MT-7719',
+    drawingVersionId: 'DV-SEED-0001',
     drawingVersion: 'Rev.B',
     material: '45# 钢',
     surfaceTreatment: '发黑',

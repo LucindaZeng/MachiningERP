@@ -26,12 +26,44 @@ export interface ListCustomersInput {
 }
 
 /**
+ * 给别的模块用的最小客户画像。刻意只含不敏感字段：
+ * 谁需要银行账号或授信额度，就该走 CustomerView 的权限判定，而不是从这里绕过去。
+ */
+export interface CustomerProfile {
+  id: string
+  code: string
+  name: string
+  shortName: string
+  paymentTerm: CustomerRecord['paymentTerm']
+  currency: string
+  salesUserCode: string | null
+}
+
+/**
+ * 开票要用到的客户档案字段。含税号与银行账号，因此只给发票模块，
+ * 不并进给所有模块用的 `CustomerProfile`。
+ */
+export interface CustomerInvoiceProfile {
+  id: string
+  code: string
+  name: string
+  region: CustomerRecord['region']
+  invoiceType: CustomerRecord['invoiceType']
+  taxNo: string | null
+  bankAccount: string | null
+  invoiceAddress: string
+  ownerEmail: string | null
+  paymentTerm: CustomerRecord['paymentTerm']
+  currency: string
+}
+
+/**
  * 客户档案主用例。
  *
  * 三条硬规则在这里落地：
  * 1. 客户编号由平台统一编号规则生成，任何入参里的 code 一律忽略并报错；
  * 2. 数据权限在查询层强制注入——没有 `customer.view-all` 的业务员只看得到自己负责的客户；
- * 3. 返回体一律经 `toCustomerView` 裁剪，香港 70% 字段对未授权者整组缺席。
+ * 3. 返回体一律经 `toCustomerView` 裁剪，财务字段对未授权者打码。
  */
 @Injectable()
 export class CustomerService {
@@ -99,6 +131,55 @@ export class CustomerService {
     }
 
     return record
+  }
+
+  /**
+   * 跨模块只读档案：编号、名称、付款条件、币种。
+   *
+   * 与 `loadVisible` 的区别是**不做业务员可见范围过滤**——调用方是别的模块
+   * （出货信用闸门、对账单抬头），它们要的是客观事实而不是某个人看得到的视图。
+   * 也因此这里只回不敏感的几个字段，银行账号、授信一律不出这个门。
+   */
+  async profileFor(customerId: string): Promise<CustomerProfile> {
+    const record = await this.customers.findById(customerId)
+    if (!record) throw new BizError(CUSTOMER_ERRORS.NOT_FOUND)
+
+    return {
+      id: record.id,
+      code: record.code,
+      name: record.name,
+      shortName: record.shortName,
+      paymentTerm: record.paymentTerm,
+      currency: record.currency,
+      salesUserCode: record.salesUserCode,
+    }
+  }
+
+  /**
+   * 开票专用档案读取。
+   *
+   * 比 `profileFor` 多出税号、银行账号、开票地址与发票种类——开票绕不开这几项。
+   * 刻意与 `profileFor` 分开而不是把字段堆进去：那个方法给出货信用闸门等场景用，
+   * 不该顺手把税务字段递出去。这里同样**不做业务员可见范围过滤**，
+   * 调用方是发票模块，要的是客观事实。
+   */
+  async invoiceProfileFor(customerId: string): Promise<CustomerInvoiceProfile> {
+    const record = await this.customers.findById(customerId)
+    if (!record) throw new BizError(CUSTOMER_ERRORS.NOT_FOUND)
+
+    return {
+      id: record.id,
+      code: record.code,
+      name: record.name,
+      region: record.region,
+      invoiceType: record.invoiceType,
+      taxNo: record.taxNo,
+      bankAccount: record.bankAccount,
+      invoiceAddress: record.invoiceAddress,
+      ownerEmail: record.ownerEmail,
+      paymentTerm: record.paymentTerm,
+      currency: record.currency,
+    }
   }
 
   async completeness(id: string, viewer: Viewer): Promise<CompletenessResult> {

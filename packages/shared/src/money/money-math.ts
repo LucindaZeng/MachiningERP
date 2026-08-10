@@ -41,7 +41,7 @@ export function isNegativeMinor(value: MoneyMinor): boolean {
 }
 
 /**
- * 金额 × 倍率（数量、损耗率、税率、汇率、香港 70% 折算等）。
+ * 金额 × 倍率（数量、损耗率、税率、汇率、折扣系数等）。
  * 倍率用 decimal 字符串表达，结果按币种精度舍入回整数分。
  */
 export function multiplyMinor(

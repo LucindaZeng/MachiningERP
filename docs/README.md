@@ -2,10 +2,12 @@
 
 ## 规划基线
 
-- [制造业 ERP 软件规划方案 V2.3](制造业ERP软件规划方案_V2.3.docx)：选型、RFP、实施范围和验收的详细基线（V2.3 增补订单四分类——新增备料订单总经办审批与加权成本结转，及客户对账单功能；V2.2 增补13部门蓝图与「模块开发顺序」章节）。
+- [制造业 ERP 软件规划方案 V2.4](制造业ERP软件规划方案_V2.4.docx)：选型、RFP、实施范围和验收的详细基线（V2.4 删除香港代生产价格功能全部内容；V2.3 增补订单四分类与客户对账单；V2.2 增补13部门蓝图与「模块开发顺序」章节）。
 - [产品范围](product/vision-and-scope.md)：目标、角色、系统边界和不在当前范围内的事项。
 - [十三部门组织与应用蓝图](product/department-operating-model.md)：工作台、数据归属、权限、流程和交接。
 - [十三部门功能、权限、预警与报表矩阵](product/department-control-matrix.md)：逐部门功能、审批边界、预警和系统报表详细清单。
+- [Codex 任务书](development/codex-tasks/)：逐模块开发任务单（当前待执行：shipment、file-preview；ECN 排最后）。
+- [部署环境与在线预览](development/deployment-environment.md)：上线服务器软件清单、本地完整运行步骤、kkFileView 文件预览接入方案。
 - [业务部模块需求规格](product/business-department-modules.md)：11个模块——工作台、报价（成本分析/修改申请）、订单（四类+订单追踪）、客户、BOM/ECN、出货退货、发票申请、报关与数据分析。
 - [需求基线](product/requirements-baseline.md)：Epic、需求编号与研发交付映射。
 - [路线图](roadmap.md)：从需求确认到试点上线的阶段门。
@@ -15,7 +17,6 @@
 
 - [跨工序返工](workflows/cross-operation-rework.md)
 - [返工子订单、重复成本与责任归集](workflows/rework-cost-accounting.md)
-- [香港代生产客户正式订单70%价格规则](workflows/hong-kong-manufacturing-orders.md)
 - [工序级制造成本核算](features/operation-level-costing.md)
 - [报价到全检包装的订单全生命周期](workflows/order-to-pack-lifecycle.md)
 - [实时金属材料价格中心](features/metal-price-center.md)

@@ -28,12 +28,6 @@ const RECORD: CustomerRecord = {
   currency: 'CNY',
   tradeTerm: 'FOB 深圳',
   level: 'A 类战略客户',
-  hkPricingEnabled: true,
-  hkFactorBps: 7000,
-  hkEffectiveFrom: new Date('2026-01-01T00:00:00Z'),
-  hkAppliedBy: 'WFX-2018-0042',
-  hkApprovedBy: 'WFX-2016-0007',
-  hkChangeReason: '香港代生产协议 2026 年续签',
   status: 'ACTIVE',
   approvedBy: 'WFX-2016-0007',
   creditLimitMinor: 120_000_000n,
@@ -58,57 +52,19 @@ const RECORD: CustomerRecord = {
 
 const salesManager: Viewer = {
   userCode: 'WFX-2018-0042',
-  permissions: [PERMISSION_CODES.HK_PRICE_VIEW, PERMISSION_CODES.CUSTOMER_FINANCE_VIEW],
+  permissions: [PERMISSION_CODES.CUSTOMER_FINANCE_VIEW],
 }
 const salesRep: Viewer = { userCode: 'WFX-2020-0088', permissions: [] }
 
-describe('香港 70% 价格是独立权限点', () => {
-  it('授权人员能看到勾选、系数与审批留痕', () => {
-    const view = toCustomerView(RECORD, salesManager)
-
-    expect(view.hk).toEqual({
-      pricingEnabled: true,
-      factor: 0.7,
-      effectiveFrom: '2026-01-01',
-      appliedBy: 'WFX-2018-0042',
-      approvedBy: 'WFX-2016-0007',
-      changeReason: '香港代生产协议 2026 年续签',
-    })
-  })
-
-  it('未授权者拿到的返回体里 hk 整组**缺席**，而不是给 false', () => {
-    const view = toCustomerView(RECORD, salesRep)
-
-    expect(view.hk).toBeUndefined()
-    expect('hk' in view).toBe(false)
-  })
-
-  it('序列化后不含任何 hk 字段与系数——列表、报表与导出复用同一出口', () => {
-    const json = JSON.stringify(toCustomerView(RECORD, salesRep))
-    const parsed = JSON.parse(json) as Record<string, unknown>
-
-    // 注意不能直接 json.not.toContain('hk')：联系人邮箱是 .hk 顶级域名，会误报
-    expect(Object.keys(parsed).some((key) => key.toLowerCase().startsWith('hk'))).toBe(false)
-    expect(json).not.toContain('7000')
-    expect(json).not.toContain('代生产协议')
-    expect(json).not.toContain('pricingEnabled')
-  })
-
+describe('财务字段按权限打码', () => {
   it('列表出口与详情出口的裁剪一致', () => {
     const [view] = toCustomerViews([RECORD], salesRep)
-    expect(view?.hk).toBeUndefined()
+    expect(view?.finance.bankAccount).toBe('**** **** 4417')
 
     const [privileged] = toCustomerViews([RECORD], salesManager)
-    expect(privileged?.hk?.factor).toBe(0.7)
+    expect(privileged?.finance.bankAccount).toBe('6222020000004417')
   })
 
-  it('系数按万分比存整数，出口才转成小数，避免浮点误差', () => {
-    const view = toCustomerView({ ...RECORD, hkFactorBps: 6667 }, salesManager)
-    expect(view.hk?.factor).toBeCloseTo(0.6667, 10)
-  })
-})
-
-describe('财务字段按权限打码', () => {
   it('有财务权限看明文', () => {
     const view = toCustomerView(RECORD, salesManager)
     expect(view.finance.taxNo).toBe('91440300MA5XXXX881')

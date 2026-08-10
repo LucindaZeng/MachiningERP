@@ -9,7 +9,6 @@ const BEFORE = {
   level: 'B 类',
   bankAccount: '6222 0000 0000 0000',
   paymentTerm: 'NET_60',
-  hkPricingEnabled: false,
   depositBps: null,
 }
 
@@ -31,16 +30,6 @@ describe('常规字段与敏感字段的分流', () => {
     expect(result.sensitive.map((change) => change.field)).toEqual(['bankAccount', 'paymentTerm'])
     expect(result.sensitive[0]?.label).toBe('银行账号')
     expect(result.sensitive[1]).toMatchObject({ before: 'NET_60', after: 'NET_30' })
-  })
-
-  it('香港勾选属于敏感字段', () => {
-    const result = splitCustomerChanges(BEFORE, { hkPricingEnabled: true })
-    expect(result.sensitive[0]).toMatchObject({
-      field: 'hkPricingEnabled',
-      label: '香港 70% 价格勾选',
-      before: false,
-      after: true,
-    })
   })
 
   it('一次改动可以同时含两类字段', () => {

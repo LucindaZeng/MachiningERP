@@ -42,7 +42,7 @@ const INPUT = {
   displayName: '罗晓琳',
   department: '业务部',
   roles: ['SALES_MANAGER'],
-  permissions: ['sales.hk-price.view'],
+  permissions: ['quote.approve'],
   ip: '10.0.0.1',
   userAgent: 'jest',
 }
@@ -66,7 +66,7 @@ describe('JWT 签发与校验', () => {
     const claims = await service.verify(issued.accessToken, NOW)
     expect(claims.sub).toBe('WFX-2018-0042')
     expect(claims.uid).toBe('user-1')
-    expect(claims.perms).toEqual(['sales.hk-price.view'])
+    expect(claims.perms).toEqual(['quote.approve'])
   })
 
   it('注销后 token 立即失效', async () => {

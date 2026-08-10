@@ -26,10 +26,6 @@ interface CustomerSeed {
   currency: string
   tradeTerm?: string
   level: string
-  hkPricingEnabled?: boolean
-  hkFactorBps?: number
-  hkEffectiveFrom?: string
-  hkChangeReason?: string
   creditLimitMinor: bigint
   creditUsedMinor: bigint
   arDays: number
@@ -38,7 +34,7 @@ interface CustomerSeed {
 
 /**
  * 演示客户，覆盖三种典型口径：
- *  - 香港代生产客户（勾选 70% 价格，只有授权业务人员看得到）；
+ *  - 港澳台代生产客户（境外交货，人民币结算）；
  *  - 国外客户（不强制税号，走报关资料英文字段）；
  *  - 国内客户（必填税号，专票 + 票到 60 天）。
  */
@@ -64,10 +60,6 @@ export const CUSTOMERS: CustomerSeed[] = [
     currency: 'CNY',
     tradeTerm: 'FOB 深圳',
     level: 'A 类战略客户',
-    hkPricingEnabled: true,
-    hkFactorBps: 7000,
-    hkEffectiveFrom: '2026-01-01',
-    hkChangeReason: '香港代生产协议 2026 年续签',
     creditLimitMinor: 120_000_000n,
     creditUsedMinor: 74_250_000n,
     arDays: 60,
@@ -135,15 +127,12 @@ export const CUSTOMERS: CustomerSeed[] = [
 
 export async function seedCustomers(prisma: PrismaClient): Promise<void> {
   for (const customer of CUSTOMERS) {
-    const { addresses, hkEffectiveFrom, ...rest } = customer
+    const { addresses, ...rest } = customer
 
     await prisma.customer.upsert({
       where: { code: customer.code },
       create: {
         ...rest,
-        hkEffectiveFrom: hkEffectiveFrom ? new Date(`${hkEffectiveFrom}T00:00:00Z`) : null,
-        hkAppliedBy: customer.hkPricingEnabled ? customer.salesUserCode : null,
-        hkApprovedBy: customer.hkPricingEnabled ? 'WFX-2016-0007' : null,
         status: 'ACTIVE',
         createdBy: 'SEED',
         addresses: {

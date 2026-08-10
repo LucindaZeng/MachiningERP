@@ -5,19 +5,6 @@ import type { DocStatus, TimelineNode } from './common.types'
 export type OrderType = 'mold' | 'sample' | 'formal' | 'stock'
 export type ChargeMode = 'charged' | 'free' | 'partial' | 'deferred' | 'deposit' | 'internal'
 
-export interface HkPricing {
-  /** 触发条件是否成立：客户已勾选 且 订单类型=正式 */
-  applied: boolean
-  factor: number
-  originalUnitPrice: string
-  finalUnitPrice: string
-  roundingRule: string
-  calculatedAt?: string
-  priceVersion: string
-  customerFlagSnapshot: boolean
-  orderTypeSnapshot: OrderType
-}
-
 /** 订单明细行：一张单可以下多项产品 */
 export interface OrderLine {
   seq: number
@@ -26,7 +13,7 @@ export interface OrderLine {
   /** 品号：只有正式订单的产品才有；样品为空，模具为模具编号 */
   itemCode?: string
   quantity: string
-  /** 客户原始单价（HK 客户的 70% 由系统按原价折算，禁止手工先折） */
+  /** 客户确认单价 */
   unitPrice: string
   amount: string
   deliveryDate: string
@@ -56,13 +43,14 @@ export interface SalesOrder {
   deliveryDate: string
   quotationNo?: string
   customerPoNo?: string
+  /** 客户订单原件的对象键；有值时详情页可在线预览 */
+  customerPoFile?: string
   costOwner?: string
   freeReason?: string
   estimatedCost?: string
   status: DocStatus
   owner: string
   t0?: string
-  hk: HkPricing
   timeline: TimelineNode[]
   reviewRounds: number
   /** 正式订单关联的备料订单与加权平均成本；备料订单本身为空 */

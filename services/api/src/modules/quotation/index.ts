@@ -53,6 +53,26 @@ export {
   type TierPayload,
 } from './services/quotation.service'
 export { QuotationReviewService } from './services/quotation-review.service'
+/** 图纸上传：一次上传，核价与 BOM 共用同一个 DrawingVersion */
+export {
+  DrawingUploadService,
+  type DrawingUploadActor,
+  type DrawingUploadInput,
+} from './services/drawing-upload.service'
+export {
+  autoRevision,
+  composeDrawingObjectKey,
+  sanitizeFileName,
+  sanitizeSegment,
+} from './services/drawing-object-key'
+export { toDrawingVersionView } from './services/drawing-version-view.mapper'
+export type { DrawingVersionView } from './dto/drawing-version-view.dto'
+export {
+  DRAWING_REPOSITORY,
+  type CreateDrawingVersionData,
+  type DrawingRepositoryPort,
+  type DrawingVersionRecord,
+} from './repositories/drawing.repository.port'
 export {
   QuoteChangeRequestService,
   type SubmitQuoteChangeInput,

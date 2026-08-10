@@ -221,7 +221,7 @@ async function generateAll(): Promise<void> {
 
         <p class="drawer-note">
           文件统一由 docgen 出（POST /documents/&#123;templateCode&#125;/render），返回受权限控制的短时效下载链接，
-          每次生成留版本快照；香港代生产订单沿用既有外贸规则，不因客户价格勾选跳过关务复核。
+          每次生成留版本快照；香港代生产订单沿用既有外贸规则，关务复核不可跳过。
         </p>
 
       </template>

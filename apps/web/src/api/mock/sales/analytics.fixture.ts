@@ -98,7 +98,7 @@ export const SALES_ANALYTICS: SalesAnalytics = {
       quotedMargin: 0.223,
       actualMargin: 0.198,
       gap: -0.025,
-      risk: '70% 计价后毛利偏低，铝价再涨 3% 将跌破目标',
+      risk: '毛利偏低，铝价再涨 3% 将跌破目标',
     },
     {
       customer: 'Brenner Maschinenbau',

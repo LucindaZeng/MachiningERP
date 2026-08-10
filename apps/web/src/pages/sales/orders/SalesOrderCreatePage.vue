@@ -33,9 +33,10 @@ const {
   removeLine,
   needPoFile,
   engineeringGaps,
-  pickPoFile,
+  poUpload,
+  uploadPoFile,
+  clearPoFile,
   needFreeFields,
-  hk,
   checks,
   canSubmit,
   submitting,
@@ -118,13 +119,17 @@ const {
           :total-amount="totalAmount"
           :currency="form.currency"
           :po-file="form.poFile"
+          :po-uploading="poUpload.uploading.value"
+          :po-percent="poUpload.percent.value"
+          :po-error="poUpload.errorMessage.value"
           :need-po-file="needPoFile"
           :is-formal="isFormal"
           :is-sample="isSample"
           :is-stock="isStock"
           @add-line="addLine"
           @remove-line="removeLine"
-          @pick-po-file="pickPoFile"
+          @pick-po-file="uploadPoFile"
+          @clear-po-file="clearPoFile"
         />
 
         <OrderStockUsageCard
@@ -141,8 +146,6 @@ const {
           v-model:currency="form.currency"
           v-model:tax-rate="form.taxRate"
           :title="isFormal ? '四、价格' : '三、价格'"
-          :hk="hk"
-          :quantity="form.quantity"
         />
 
         <OrderCostFieldsCard

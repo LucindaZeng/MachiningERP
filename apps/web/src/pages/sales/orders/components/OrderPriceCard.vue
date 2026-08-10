@@ -1,14 +1,7 @@
 <script setup lang="ts">
-import HkPriceBreakdown from './HkPriceBreakdown.vue'
-
-import type { HkPricing } from '@/types/sales.types'
-
 defineProps<{
   /** 卡片序号随「备料领用」卡片是否出现而变，由父页编排，组件不判断订单类型 */
   title: string
-  /** HK 70% 试算结果；客户或原始单价未填时为 null，此时显示空态 */
-  hk: HkPricing | null
-  quantity: string
 }>()
 
 const originalUnitPrice = defineModel<string>('originalUnitPrice', { required: true })
@@ -48,9 +41,6 @@ const taxRate = defineModel<string>('taxRate', { required: true })
         </el-form-item>
       </el-col>
     </el-row>
-
-    <HkPriceBreakdown v-if="hk" :hk="hk" :currency="currency" :quantity="quantity || '0'" />
-    <el-empty v-else description="填写客户与原始单价后自动试算" :image-size="60" />
   </el-card>
 </template>
 

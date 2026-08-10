@@ -20,6 +20,7 @@ export const QUOTATIONS: Quotation[] = [
     customerName: '香港宏晟精密（代生产）',
     productName: '连接器外壳 CNC 件',
     drawingNo: 'HS-4471-A',
+    drawingVersionId: 'DV-SEED-0001',
     drawingVersion: 'Rev.C',
     material: '6061-T6 铝合金',
     surfaceTreatment: '阳极氧化（本色）',

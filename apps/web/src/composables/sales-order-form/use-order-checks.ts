@@ -2,18 +2,16 @@ import { computed } from 'vue'
 
 import { buildBlockingChecks } from './blocking-checks'
 import { collectEngineeringGaps } from './engineering-gaps'
-import { isHkPriceConsistent } from './order-pricing'
 
 import type { BlockingCheck, BlockingCheckContext } from './blocking-checks'
 import type { SalesOrderFormModel } from './form-model'
 import type { OrderTypeFlags } from './use-order-type-flags'
-import type { HkPricing, StockLink } from '@/types/sales.types'
-import type { ComputedRef, Ref } from 'vue'
+import type { StockLink } from '@/types/sales.types'
+import type { ComputedRef } from 'vue'
 
 export interface OrderChecksInput {
   form: SalesOrderFormModel
   flags: OrderTypeFlags
-  hk: Ref<HkPricing | null>
   stockUsage: ComputedRef<StockLink | null>
 }
 
@@ -40,7 +38,6 @@ function snapshot(input: OrderChecksInput, engineeringGaps: string[]): BlockingC
     needFreeFields: flags.needFreeFields.value,
     needPoFile: flags.needPoFile.value,
     engineeringGaps,
-    hkConsistent: isHkPriceConsistent(input.hk.value),
     stockUsageReady: Boolean(input.stockUsage.value) && Number(form.produceUnitCost) > 0,
   }
 }

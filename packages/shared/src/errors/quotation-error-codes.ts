@@ -72,6 +72,17 @@ export const QUOTATION_ERRORS = {
     status: 422,
     message: '驳回报价单修改申请必须填写理由',
   },
+  /** 图纸库版本不存在或已被删除 */
+  DRAWING_VERSION_NOT_FOUND: {
+    code: 'ORD_2223',
+    status: 404,
+    message: '图纸版本不存在',
+  },
+  SALES_ROLE_REQUIRED: {
+    code: 'ORD_2224',
+    status: 403,
+    message: '该操作需要业务或报价工程师权限',
+  },
 } as const satisfies Record<string, BizErrorDefinition>
 
 export type QuotationErrorKey = keyof typeof QUOTATION_ERRORS

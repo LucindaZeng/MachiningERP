@@ -70,7 +70,7 @@ describe('金额运算', () => {
     expect(isNegativeMinor(cny(0n))).toBe(false)
   })
 
-  it('乘倍率：13% 增值税与香港 70% 折算', () => {
+  it('乘倍率：13% 增值税与 70% 折扣系数', () => {
     expect(multiplyMinor(cny(10000n), '1.13')).toEqual(cny(11300n))
     expect(multiplyMinor(cny(10000n), '0.7')).toEqual(cny(7000n))
     // 5% 损耗 + 5% 管理费利润：分两步各自取整，口径与成本分析表一致

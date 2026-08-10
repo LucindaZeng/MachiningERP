@@ -1,0 +1,50 @@
+import { RETURN_TIMELINE_NODES } from '../constants/return-timeline'
+
+import type { TimelineNodeRecord } from '../../../platform/timeline'
+import type { DocTimelineNodeView } from '../../shipment'
+
+const MS_PER_HOUR = 3_600_000
+
+/** RMA-01~05 的固定顺序；没有记录的节点补成 pending，界面才有完整的五格。 */
+const CANONICAL_NODES = Object.values(RETURN_TIMELINE_NODES)
+
+function stateOf(record: TimelineNodeRecord): DocTimelineNodeView['state'] {
+  if (record.status === 'ABNORMAL') return 'overdue'
+  if (record.leftAt === null) return 'active'
+  return 'done'
+}
+
+function toNodeView(record: TimelineNodeRecord, fallbackOwner: string): DocTimelineNodeView {
+  const view: DocTimelineNodeView = {
+    node: record.node,
+    owner: record.ownerDept ?? record.ownerUserCode ?? fallbackOwner,
+    state: stateOf(record),
+  }
+  view.enteredAt = record.enteredAt.toISOString()
+  if (record.leftAt) view.finishedAt = record.leftAt.toISOString()
+  if (record.durationMs !== null) {
+    view.elapsedHours = Math.round((Number(record.durationMs) / MS_PER_HOUR) * 100) / 100
+  }
+  if (record.remark) view.remark = record.remark
+  return view
+}
+
+/**
+ * 把平台落库的节点记录铺成前端要的五格时间线。
+ *
+ * 首响 SLA（fixture 里「2 小时首响 SLA 内完成」）因此是**算出来的**：
+ * 耗时一律取平台算好的 durationMs，本模块不自己减时间戳——
+ * 两处各算一次迟早会算出两个答案。
+ */
+export function toReturnTimelineView(
+  records: readonly TimelineNodeRecord[],
+  fallbackOwner: string,
+): DocTimelineNodeView[] {
+  const byNode = new Map(records.map((record) => [record.node, record]))
+
+  return CANONICAL_NODES.map((canonical) => {
+    const record = byNode.get(canonical.node)
+    if (record) return toNodeView(record, fallbackOwner)
+    return { node: canonical.node, owner: canonical.ownerDept, state: 'pending' as const }
+  })
+}

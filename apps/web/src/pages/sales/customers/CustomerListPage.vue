@@ -4,12 +4,7 @@ import { INVOICE_TYPE_LABELS, PAYMENT_TERM_LABELS } from '@machining-erp/shared'
 import { computed, ref } from 'vue'
 
 import { fetchCustomers } from '@/api/sales/customer.api'
-import {
-  matchEq,
-  matchNumberRange,
-  type FilterField,
-  type FilterValue,
-} from '@/components/filter-helpers'
+import { matchEq, matchNumberRange, type FilterField } from '@/components/filter-helpers'
 import FilterBar from '@/components/FilterBar.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { CUSTOMER_STATUS } from '@/components/status-dictionary'
@@ -64,16 +59,6 @@ const FILTER_FIELDS: FilterField[] = [
     width: 130,
   },
   {
-    key: 'hkPricingEnabled',
-    label: 'HK 价格规则',
-    type: 'select',
-    options: [
-      { label: '已启用 ×0.7', value: 'true' },
-      { label: '未启用', value: 'false' },
-    ],
-    width: 160,
-  },
-  {
     key: 'overdue',
     label: '逾期应收',
     type: 'select',
@@ -91,17 +76,6 @@ function paymentTermLabel(row: Customer): string {
   return PAYMENT_TERM_LABELS[row.paymentTerm]
 }
 
-/**
- * hk 整组缺席意味着当前账号没有 sales.hk-price.view，而不是「未勾选」。
- * 这种行一旦选了该筛选项就直接排除，避免把「看不到」误判成「没启用」。
- */
-function matchHkPricing(row: Customer, filter: FilterValue): boolean {
-  if (!filter) {
-    return true
-  }
-  return row.hk ? matchEq(row.hk.pricingEnabled, filter) : false
-}
-
 const { filtered, loading, keyword, filters, resetFilters, reload } = useResourceList<Customer>(
   fetchCustomers, (row) => [
   row.code,
@@ -115,7 +89,6 @@ const { filtered, loading, keyword, filters, resetFilters, reload } = useResourc
       matchEq(row.country, f.country) &&
       matchEq(row.level ?? undefined, f.level) &&
       matchEq(row.status, f.status) &&
-      matchHkPricing(row, f.hkPricingEnabled) &&
       matchEq(Number(row.finance.overdueAmount.amount) > 0 ? 'yes' : 'no', f.overdue) &&
       matchNumberRange(
         Number(row.finance.creditLimit.amount)
@@ -187,14 +160,6 @@ function openDetail(row: Customer): void {
         <el-table-column label="付款条件" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ paymentTermLabel(row) }}</template>
         </el-table-column>
-        <el-table-column label="香港 70% 价格" width="120">
-          <template #default="{ row }">
-            <el-tag v-if="row.hk?.pricingEnabled" type="warning" size="small" effect="dark">
-              已启用 ×0.7
-            </el-tag>
-            <span v-else class="muted">—</span>
-          </template>
-        </el-table-column>
         <el-table-column label="信用占用" width="150">
           <template #default="{ row }">
             <el-progress
@@ -258,41 +223,6 @@ function openDetail(row: Customer): void {
             <template v-if="depositText">（预付 {{ depositText }}）</template>
           </el-descriptions-item>
         </el-descriptions>
-
-        <h3 class="drawer-title">
-          香港代生产价格规则
-          <el-tag size="small" type="info" effect="plain">HKO</el-tag>
-        </h3>
-        <el-card shadow="never" class="hk-card">
-          <!-- hk 整组由后端按 sales.hk-price.view 下发；缺席即无权限，不在前端补默认值 -->
-          <template v-if="current.hk">
-            <el-switch
-              :model-value="current.hk.pricingEnabled"
-              disabled
-              active-text="按输入价 ×70% 计价（仅正式业务订单）"
-              inactive-text="未启用"
-            />
-            <el-descriptions v-if="current.hk.pricingEnabled" :column="2" size="small" class="hk-desc">
-              <el-descriptions-item label="固定系数">
-                {{ current.hk.factor }}（业务不可修改）
-              </el-descriptions-item>
-              <el-descriptions-item label="生效时间">
-                {{ current.hk.effectiveFrom }}
-              </el-descriptions-item>
-              <el-descriptions-item label="申请人">{{ current.hk.appliedBy }}</el-descriptions-item>
-              <el-descriptions-item label="审批人">{{ current.hk.approvedBy }}</el-descriptions-item>
-              <el-descriptions-item label="变更原因" :span="2">
-                {{ current.hk.changeReason }}
-              </el-descriptions-item>
-            </el-descriptions>
-          </template>
-          <p v-else class="hk-note">
-            当前账号没有 sales.hk-price.view 权限，接口不下发香港 70% 价格规则。
-          </p>
-          <p class="hk-note">
-            样品与模具订单即使客户已勾选也一律 ×100%；勾选、取消勾选与系数变更全部写入价格规则变更审计表。
-          </p>
-        </el-card>
 
         <h3 class="drawer-title">
           财务维护字段
@@ -371,10 +301,6 @@ function openDetail(row: Customer): void {
   color: var(--wfx-text-muted);
 }
 
-.muted {
-  color: var(--wfx-text-muted);
-}
-
 .drawer-title {
   display: flex;
   gap: 8px;
@@ -386,21 +312,6 @@ function openDetail(row: Customer): void {
 
 .drawer-title:first-child {
   margin-top: 0;
-}
-
-.hk-card {
-  background: var(--wfx-surface-alt);
-}
-
-.hk-desc {
-  margin-top: 14px;
-}
-
-.hk-note {
-  margin: 12px 0 0;
-  font-size: 12px;
-  line-height: 1.7;
-  color: var(--wfx-text-muted);
 }
 
 .is-danger {

@@ -7,7 +7,7 @@ const ROLE_KEY = 'erp.demo.role'
 
 /**
  * 演示用角色切换：真实环境角色来自登录态与角色-权限矩阵，不可由前端切换。
- * 这里保留切换器是为了在原型上直观演示「香港 70% 只有业务部可见」「成本核算只有报价工程师可做」。
+ * 这里保留切换器是为了在原型上直观演示「成本核算只有报价工程师可做」这类权限差异。
  */
 export const useRoleStore = defineStore('role', () => {
   const code = ref<string>(localStorage.getItem(ROLE_KEY) ?? DEMO_ROLES[0].code)

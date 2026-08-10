@@ -41,7 +41,7 @@ export interface UpdateCustomerResult {
 }
 
 /**
- * 改档。常规字段直接生效，敏感字段（银行账号、付款条件、香港勾选等）
+ * 改档。常规字段直接生效，敏感字段（银行账号、付款条件等）
  * 一律转成变更申请，审批通过后才落库（业务规格 3.2）。
  */
 @Injectable()
@@ -186,10 +186,6 @@ export class CustomerUpdateService {
         address: address.address,
         isDefault: address.isDefault,
       })),
-      hkPricingEnabled: merged.hkPricingEnabled,
-      hkFactorBps: merged.hkFactorBps,
-      hkEffectiveFrom: merged.hkEffectiveFrom ? String(merged.hkEffectiveFrom) : null,
-      hkChangeReason: merged.hkChangeReason,
     })
 
     if (issues.length > 0) {

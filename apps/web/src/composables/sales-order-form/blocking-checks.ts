@@ -19,8 +19,6 @@ export interface BlockingCheckContext {
   needFreeFields: boolean
   needPoFile: boolean
   engineeringGaps: string[]
-  /** HK 70% 原始价 × 系数与计算后价格是否一致 */
-  hkConsistent: boolean
   /** 领用备料时加权成本是否已试算出来 */
   stockUsageReady: boolean
 }
@@ -54,7 +52,8 @@ function documentChecks(ctx: BlockingCheckContext): BlockingCheck[] {
     },
     {
       label: ctx.needPoFile ? '客户订单原件已上传' : '本类型无需上传客户订单原件',
-      passed: !ctx.needPoFile || Boolean(form.poFile),
+      // 认对象键而不是文件名——只有真上传成功才算数
+      passed: !ctx.needPoFile || Boolean(form.poFileKey),
       hint: '模具订单与正式业务订单必须上传客户订单原件；样品订单只要收费也必须上传，免费样品可豁免',
     },
   ]
@@ -70,7 +69,7 @@ function isLineComplete(line: OrderLine, ctx: BlockingCheckContext): boolean {
   )
 }
 
-/** 价格与收费要素：客户 PO、报价、非零价、免费四要素、HK 一致性 */
+/** 价格与收费要素：客户 PO、报价、非零价、免费四要素 */
 function priceChecks(ctx: BlockingCheckContext): BlockingCheck[] {
   const { form, isFormal } = ctx
   return [
@@ -94,11 +93,6 @@ function priceChecks(ctx: BlockingCheckContext): BlockingCheck[] {
       passed:
         !ctx.needFreeFields || Boolean(form.costOwner && form.estimatedCost && form.freeReason),
       hint: '模具 / 样品免费或部分收费必须填费用承担方、预计成本、原因并完成审批',
-    },
-    {
-      label: 'HK 70% 价格一致性',
-      passed: ctx.hkConsistent,
-      hint: '原始价 × 系数必须等于计算后价格，防止业务先手工乘 70% 造成重复折算',
     },
   ]
 }

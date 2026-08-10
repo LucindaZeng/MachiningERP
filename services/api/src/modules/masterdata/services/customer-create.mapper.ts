@@ -35,13 +35,6 @@ export function toCreateCustomerData(
     currency: input.currency ?? 'CNY',
     tradeTerm: input.tradeTerm ?? null,
     level: input.level ?? null,
-    hkPricingEnabled: input.hkPricingEnabled ?? false,
-    // 10000 万分比 = 100%，即不打折
-    hkFactorBps: input.hkFactorBps ?? 10_000,
-    hkEffectiveFrom: input.hkEffectiveFrom ? new Date(input.hkEffectiveFrom) : null,
-    // 谁勾的香港价格必须留痕，供审计追责
-    hkAppliedBy: input.hkPricingEnabled ? actorUserCode : null,
-    hkChangeReason: input.hkChangeReason ?? null,
     // 报价阶段的新客户先建草稿，成交下单前再补全
     status: input.draft ? 'DRAFT' : 'ACTIVE',
     createdBy: actorUserCode,

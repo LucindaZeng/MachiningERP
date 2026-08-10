@@ -17,7 +17,7 @@ function build(): { service: UserDirectoryService; users: FakeUserRepository } {
     employmentStatus: 'ACTIVE',
     leftAt: null,
     roleCodes: ['SALES_MANAGER'],
-    permissionCodes: ['sales.hk-price.view'],
+    permissionCodes: ['quote.approve'],
   })
   return { service: new UserDirectoryService(users), users }
 }

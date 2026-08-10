@@ -43,12 +43,6 @@ export interface CustomerRecord {
   currency: string
   tradeTerm: string | null
   level: string | null
-  hkPricingEnabled: boolean
-  hkFactorBps: number
-  hkEffectiveFrom: Date | null
-  hkAppliedBy: string | null
-  hkApprovedBy: string | null
-  hkChangeReason: string | null
   status: CustomerStatus
   approvedBy: string | null
   creditLimitMinor: bigint
@@ -99,11 +93,6 @@ export interface CreateCustomerData {
   currency: string
   tradeTerm: string | null
   level: string | null
-  hkPricingEnabled: boolean
-  hkFactorBps: number
-  hkEffectiveFrom: Date | null
-  hkAppliedBy: string | null
-  hkChangeReason: string | null
   status: CustomerStatus
   createdBy: string
   addresses: DeliveryAddressDraft[]

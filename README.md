@@ -16,12 +16,11 @@
 - 从业务订单提交开始量化业务经理/财务审核、订单评审、MRP、采购、收料、检验、生产、委外和包装的节点耗时与超期责任。
 - 区分模具订单、样品订单和正式业务订单；模具/样品允许按审批免费，正式业务订单强制收费，三类订单均完整核算成本。
 - 每次返工拆出独立子订单，重新核算全部重复工序；区分正常二次委外应付与供应商责任无偿返工，并计算责任毛损失、追偿和企业净损失。
-- 支持香港代生产客户价格规则：在客户主数据勾选特定客户后，仅其正式业务订单按输入价格70%计价；样品、模具及其他客户保持原价，其他流程全部不变。
 - 每一道实际工艺独立核算成本：保存本工序新增成本、转入累计成本、单位成本、标准/实际差异，并汇总到订单、产品和客户毛利。
 
 ## 需求基线
 
-当前详细规划基线为 [《制造业 ERP 软件规划方案 V2.3》](docs/制造业ERP软件规划方案_V2.3.docx)。Word 文档用于 ERP 选型、RFP、实施范围和验收；仓库内 Markdown 文档用于研发协作和版本化决策。
+当前详细规划基线为 [《制造业 ERP 软件规划方案 V2.4》](docs/制造业ERP软件规划方案_V2.4.docx)。Word 文档用于 ERP 选型、RFP、实施范围和验收；仓库内 Markdown 文档用于研发协作和版本化决策。
 
 重点专题：
 
@@ -31,7 +30,6 @@
 - [需求基线与 Epic 映射](docs/product/requirements-baseline.md)
 - [跨工序返工流程](docs/workflows/cross-operation-rework.md)
 - [返工子订单、重复成本与责任归集](docs/workflows/rework-cost-accounting.md)
-- [香港代生产客户正式订单70%价格规则](docs/workflows/hong-kong-manufacturing-orders.md)
 - [工序级制造成本核算](docs/features/operation-level-costing.md)
 - [报价到全检包装的订单全生命周期](docs/workflows/order-to-pack-lifecycle.md)
 - [实时金属材料价格中心](docs/features/metal-price-center.md)
@@ -49,7 +47,6 @@
 | 领域 | 主要能力 |
 | --- | --- |
 | 报价与订单 | 图纸询价、相似产品、材料与工序成本、审批、合同评审、订单变更、客户协同 |
-| 香港客户价格规则 | 客户级勾选、正式订单输入价×70%、样品模具不转换、原价/计算价留痕、其余流程不变 |
 | 工程与 PLM | 物料、图纸、BOM、工艺、工装刀具、检验标准、版本与工程变更 |
 | PMC/MRP/APS | 净需求、动态齐套、采购/生产/委外建议、有限排程、资源冲突和交期模拟 |
 | 采购/SRM | 供应商在线报价、比价定标、订单确认、进度、ASN、送货、质量和对账 |
@@ -66,26 +63,17 @@
 
 ## 仓库结构
 
-pnpm monorepo（workspace 定义见 `pnpm-workspace.yaml`，目录约束见 [开发文档第 1 节](docs/development/development-guide.md)）：
-
 ```text
 .
 ├── .github/                 # Issue、PR、Actions 与依赖更新配置
-├── apps/
-│   └── web/                 # 内部十三部门前端（Vue 3 + Vite + Pinia + Element Plus）
-├── services/
-│   └── api/                 # 核心后端（NestJS 模块化单体 + Prisma）
-├── packages/
-│   └── shared/              # 前后端共享契约：类型、错误码、金额与数量计算原语
-├── infra/                   # docker-compose、环境模板、部署与监控
+├── apps/                    # 未来的 ERP Web、门户和移动端应用
+├── services/                # 未来的业务 API、集成、任务与 AI 服务
+├── packages/                # 共享领域模型、契约、UI 和工具包
+├── infra/                   # 部署、环境、监控、备份与基础设施
 ├── tests/                   # 端到端验收、集成、权限与性能测试
 ├── docs/                    # 产品、架构、流程、路线图和 Word 规划方案
-└── tools/                   # 文档生成、仓库质量与模块边界检查工具
+└── tools/                   # 文档生成和仓库质量检查工具
 ```
-
-### 模块化铁律
-
-「一个文件只做一件事、跨模块只走 `index.ts`、单文件 ≤ 400 行、单函数 ≤ 60 行、单 controller ≤ 8 个路由」不是口号，它由三层自动化把关：ESLint 尺寸红线与分层依赖约束、`tools/check-module-boundaries.mjs` 的结构化校验、以及编译全量 AppModule 的依赖注入测试。任何一条不过，`pnpm lint` 与 `pnpm test` 就是红的。
 
 ## 工作方式
 
@@ -96,32 +84,12 @@ pnpm monorepo（workspace 定义见 `pnpm-workspace.yaml`，目录约束见 [开
 5. 财务、总经办、生产、品质、后工序、工程、PMC、采购、委外和行政使用独立工作台与权限范围。
 6. 报价、库存、成本、财务、考勤和 AI 结果必须可追溯到源单据与数据截止时间。
 
-## 本地开发
-
-```bash
-pnpm install
-
-# 后端：起数据库 → 建表 → 灌基础数据 → 起服务
-cp infra/.env.example infra/.env
-cp services/api/.env.example services/api/.env
-pnpm db:up && pnpm db:migrate && pnpm db:seed
-pnpm dev:api          # http://localhost:3000/api/v1（接口文档 /api/v1/docs）
-
-# 前端：默认走 mock，把 apps/web/.env.development 的 VITE_USE_MOCK 改成 false 即接真后端
-pnpm dev:web          # http://localhost:5173
-```
-
-演示账号密码统一 `Wfx@2026`：`admin`（IT）、`lucinda`（总经办）、`luoxiaolin`（业务主管，有香港 70% 价格权限）、`chenzhiqiang`（业务员，无该权限）、`wugong`（报价工程师）。后端能力清单见 [services/api/README.md](services/api/README.md)。
-
 ## 本地检查
 
+仓库检查脚本只使用 Python 标准库：
+
 ```bash
-pnpm lint                            # ESLint（含模块化尺寸红线与分层约束）
-pnpm typecheck                       # 三个包全量类型检查
-pnpm test                            # 单元测试
-pnpm test:cov                        # 覆盖率（核心算法目录门槛 90% 分支）
-node tools/check-module-boundaries.mjs   # 模块目录约定、controller 路由数、DTO 单一导出
-python3 tools/check_repository.py        # 仓库基线检查（只用 Python 标准库）
+python3 tools/check_repository.py
 ```
 
 Word 规划方案由 `tools/build_erp_plan.py` 生成。正式交付前必须渲染并逐页检查，不能只依赖文本或 OOXML 校验。

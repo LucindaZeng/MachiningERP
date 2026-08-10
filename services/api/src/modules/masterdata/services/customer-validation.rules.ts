@@ -26,10 +26,6 @@ export interface CustomerProfileInput {
   invoiceType: InvoiceType
   settlement: SettlementMethod
   addresses: DeliveryAddressInput[]
-  hkPricingEnabled?: boolean
-  hkFactorBps?: number | null
-  hkEffectiveFrom?: string | null
-  hkChangeReason?: string | null
 }
 
 export interface ValidationIssue {
@@ -99,18 +95,6 @@ function checkAddresses(issues: ValidationIssue[], addresses: DeliveryAddressInp
   }
 }
 
-/** 勾选香港 70% 价格时必须同时给出生效日期与变更理由，便于审计追责。 */
-function checkHkPricing(issues: ValidationIssue[], input: CustomerProfileInput): void {
-  if (!input.hkPricingEnabled) return
-
-  const factor = input.hkFactorBps
-  if (factor == null || !Number.isInteger(factor) || factor <= 0 || factor > BPS_SCALE) {
-    issues.push({ field: 'hkFactorBps', message: '香港价格系数必须在 0% 与 100% 之间' })
-  }
-  requireText(issues, 'hkEffectiveFrom', input.hkEffectiveFrom, '香港价格生效日期')
-  requireText(issues, 'hkChangeReason', input.hkChangeReason, '香港价格变更理由')
-}
-
 /** 客户档案的完整校验。返回全部问题而不是遇错即停，界面可一次性提示。 */
 export function validateCustomerProfile(input: CustomerProfileInput): ValidationIssue[] {
   const issues: ValidationIssue[] = []
@@ -125,7 +109,6 @@ export function validateCustomerProfile(input: CustomerProfileInput): Validation
   checkTaxNo(issues, input)
   checkPaymentTerm(issues, input)
   checkAddresses(issues, input.addresses)
-  checkHkPricing(issues, input)
 
   return issues
 }

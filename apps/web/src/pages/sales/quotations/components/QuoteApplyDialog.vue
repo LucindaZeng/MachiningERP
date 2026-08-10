@@ -1,9 +1,14 @@
 <script setup lang="ts">
 import { Delete, Plus, UploadFilled } from '@element-plus/icons-vue'
+import { UPLOAD_ACCEPT_ATTRIBUTE } from '@machining-erp/shared'
 import { ElMessage } from 'element-plus'
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref } from 'vue'
 
+import { uploadDrawing, type DrawingVersionView } from '@/api/sales/drawing.api'
 import DraftToolbar from '@/components/DraftToolbar.vue'
+import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
+import { useFilePreview } from '@/composables/use-file-preview'
+import { useFileUpload } from '@/composables/use-file-upload'
 import { useFormDraft } from '@/composables/use-form-draft'
 
 const props = defineProps<{ modelValue: boolean }>()
@@ -29,6 +34,8 @@ interface ApplyForm extends Record<string, unknown> {
   currency: string
   remark: string
   drawingFile: string
+  /** 上传成功后拿到的图纸版本主键；提交报价申请的硬前提 */
+  drawingVersionId: string
 }
 
 const form = reactive<ApplyForm>({
@@ -42,6 +49,7 @@ const form = reactive<ApplyForm>({
   currency: 'CNY',
   remark: '',
   drawingFile: '',
+  drawingVersionId: '',
 })
 
 const { drafts, lastSavedAt, save, load, remove } = useFormDraft<ApplyForm>('quote-apply', form)
@@ -61,7 +69,8 @@ const checks = computed(() => [
   { label: '产品名称与图号', passed: Boolean(form.productName && form.drawingNo) },
   {
     label: '图纸（强制上传）',
-    passed: Boolean(form.drawingFile),
+    // 认的是上传回来的版本 id，不是文件名——只有真上传成功才算数
+    passed: Boolean(form.drawingVersionId),
     hint: '报价单必须上传图纸；系统会把图纸同时分发给报价工程师报价、以及工程用于建立 BOM',
   },
   {
@@ -91,10 +100,52 @@ function switchMode(mode: 'tier' | 'single'): void {
   ]
 }
 
-/** 原型阶段用文件名占位，接入后端后走 docgen 附件服务并保留版本 */
+const drawingUpload = useFileUpload<DrawingVersionView>()
+const filePreview = useFilePreview()
+const fileInput = ref<HTMLInputElement>()
+
 function pickDrawing(): void {
-  form.drawingFile = `${form.drawingNo || 'DRAWING'}_${form.drawingVersion}.pdf`
-  ElMessage.success('图纸已上传，将同时分发给报价工程师与工程（BOM 建立）')
+  if (!form.drawingNo.trim()) {
+    ElMessage.warning('请先填写图号，图纸要挂在图号下面')
+    return
+  }
+  fileInput.value?.click()
+}
+
+/** 真上传：成功后记住 drawingVersionId，下游核价与 BOM 都引用它，不再重传。 */
+async function onFilePicked(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  const version = await drawingUpload.run((onProgress) =>
+    uploadDrawing({
+      file,
+      drawingNo: form.drawingNo.trim(),
+      revision: form.drawingVersion.trim() || undefined,
+      onProgress,
+    }),
+  )
+
+  if (!version) return
+
+  form.drawingVersionId = version.drawingVersionId
+  form.drawingFile = version.fileName
+  form.drawingVersion = version.revision
+  ElMessage.success(`图纸 ${version.revision} 已上传，将同时分发给报价工程师与工程（BOM 建立）`)
+}
+
+function previewDrawing(): void {
+  if (form.drawingVersionId) {
+    void filePreview.open('drawing-version', form.drawingVersionId)
+  }
+}
+
+function clearDrawing(): void {
+  form.drawingVersionId = ''
+  form.drawingFile = ''
+  drawingUpload.reset()
 }
 
 function submit(): void {
@@ -155,13 +206,52 @@ function submit(): void {
 
       <el-form-item label="图纸" required>
         <div class="upload">
-          <el-button :icon="UploadFilled" @click="pickDrawing">上传图纸（PDF / STEP）</el-button>
-          <span v-if="form.drawingFile" class="upload__file">
+          <input
+            ref="fileInput"
+            type="file"
+            class="upload__input"
+            :accept="UPLOAD_ACCEPT_ATTRIBUTE"
+            @change="onFilePicked"
+          />
+          <el-button
+            :icon="UploadFilled"
+            :loading="drawingUpload.uploading.value"
+            @click="pickDrawing"
+          >
+            {{ form.drawingVersionId ? '重新上传（生成新版本）' : '上传图纸（PDF / DWG / STEP）' }}
+          </el-button>
+
+          <el-progress
+            v-if="drawingUpload.uploading.value"
+            class="upload__progress"
+            :percentage="drawingUpload.percent.value"
+            :stroke-width="14"
+            striped
+            striped-flow
+          />
+
+          <span v-else-if="form.drawingVersionId" class="upload__file">
             {{ form.drawingFile }}
+            <el-tag size="small" effect="plain">{{ form.drawingVersion }}</el-tag>
             <el-tag size="small" type="success" effect="plain">已分发：报价工程师 · 工程 BOM</el-tag>
+            <el-button link type="primary" @click="previewDrawing">预览</el-button>
+            <el-button link type="danger" @click="clearDrawing">移除</el-button>
           </span>
           <span v-else class="upload__empty">未上传图纸，无法提交报价申请</span>
         </div>
+
+        <el-alert
+          v-if="drawingUpload.errorMessage.value"
+          class="upload__error"
+          type="error"
+          :closable="false"
+          show-icon
+          title="图纸上传失败"
+          :description="drawingUpload.errorMessage.value"
+        />
+        <p class="upload__hint">
+          改错的图纸请直接重新上传：系统会生成**新版本**并保留旧版，绝不覆盖。
+        </p>
       </el-form-item>
 
       <el-form-item label="数量口径">
@@ -245,9 +335,38 @@ function submit(): void {
       </el-button>
     </template>
   </el-dialog>
+
+  <FilePreviewDialog
+    v-model="filePreview.visible.value"
+    :loading="filePreview.loading.value"
+    :preview="filePreview.preview.value"
+    :unsupported="filePreview.unsupported.value"
+    :error-message="filePreview.errorMessage.value"
+    @close="filePreview.close"
+    @download="filePreview.download"
+  />
 </template>
 
 <style scoped>
+.upload__input {
+  display: none;
+}
+
+.upload__progress {
+  flex: 1 1 240px;
+  min-width: 200px;
+}
+
+.upload__error {
+  margin-top: 10px;
+}
+
+.upload__hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--wfx-text-muted);
+}
+
 .apply-alert {
   margin-bottom: 14px;
 }

@@ -31,7 +31,7 @@ def build() -> str:
     lines = [
         "# 从报价到全检包装的订单全生命周期",
         "",
-        "> 本文件由 `tools/build_order_lifecycle.py` 根据 `tools/order_lifecycle.py` 生成，是ERP V2.0的订单流程研发基线。香港代生产客户正式订单70%价格规则见 [香港客户价格规则](hong-kong-manufacturing-orders.md)，每道工艺独立核算见 [工序级成本](../features/operation-level-costing.md)。",
+        "> 本文件由 `tools/build_order_lifecycle.py` 根据 `tools/order_lifecycle.py` 生成，是ERP V2.0的订单流程研发基线。每道工艺独立核算见 [工序级成本](../features/operation-level-costing.md)。",
         "",
         "## 监测边界",
         "",

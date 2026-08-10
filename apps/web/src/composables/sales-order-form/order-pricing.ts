@@ -1,4 +1,4 @@
-import type { HkPricing, OrderLine, StockLink, StockOrder } from '@/types/sales.types'
+import type { OrderLine, StockLink, StockOrder } from '@/types/sales.types'
 
 /** 金额口径全局统一在这里：数量 × 单价，两位小数，避免各处 toFixed 参数不一致 */
 export function lineAmount(line: OrderLine): string {
@@ -14,18 +14,6 @@ export function sumLineAmount(lines: OrderLine[]): number {
     (sum, line) => sum + Number(line.quantity || '0') * Number(line.unitPrice || '0'),
     0,
   )
-}
-
-/**
- * HK 70% 一致性：原始价 × 系数必须等于计算后价格。
- * 业务如果自己先手工乘过 70% 再录入，系统再折一次就是重复折算，这里用半分钱容差兜住浮点误差。
- */
-export function isHkPriceConsistent(hk: HkPricing | null): boolean {
-  if (!hk) {
-    return true
-  }
-  const expected = Number(hk.originalUnitPrice) * hk.factor
-  return Math.abs(expected - Number(hk.finalUnitPrice)) < 0.005
 }
 
 /**

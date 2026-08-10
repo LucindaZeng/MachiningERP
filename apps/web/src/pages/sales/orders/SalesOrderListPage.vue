@@ -87,16 +87,6 @@ const FILTER_FIELDS: FilterField[] = [
     ],
     width: 130,
   },
-  {
-    key: 'hkApplied',
-    label: 'HK 70%',
-    type: 'select',
-    options: [
-      { label: '已应用 70%', value: 'true' },
-      { label: '未应用', value: 'false' },
-    ],
-    width: 140,
-  },
   { key: 'deliveryDate', label: '客户交期', type: 'date-range' },
 ]
 
@@ -114,7 +104,6 @@ const { filtered, loading, keyword, filters, resetFilters, reload } = useResourc
       matchEq(row.chargeMode, f.chargeMode) &&
       matchEq(row.customerName, f.customerName) &&
       matchEq(row.status, f.status) &&
-      matchEq(row.hk.applied, f.hkApplied) &&
       matchDateRange(row.deliveryDate, f.deliveryDate),
   },
 )

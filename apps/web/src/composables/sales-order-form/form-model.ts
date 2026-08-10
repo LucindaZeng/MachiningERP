@@ -24,6 +24,8 @@ export interface SalesOrderFormModel {
   produceUnitCost: string
   /** 客户订单原件附件名（模具 / 正式订单强制；样品订单有价格时强制） */
   poFile: string
+  /** 上传得到的对象键；建单请求以此写入 customerPoFile */
+  poFileKey: string
   /** 一张单多项产品的明细行 */
   lines: OrderLine[]
 }
@@ -68,6 +70,7 @@ export function createEmptyForm(): SalesOrderFormModel {
     stockOrderNo: '',
     produceUnitCost: '',
     poFile: '',
+    poFileKey: '',
     lines: [createEmptyLine(1)],
   }
 }

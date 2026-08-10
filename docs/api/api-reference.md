@@ -23,7 +23,7 @@
 
 | 端点 | 说明 |
 | --- | --- |
-| /materials, /customers, /suppliers | 物料/客户/供应商主数据；客户含 `hkPricingEnabled` 勾选 |
+| /materials, /customers, /suppliers | 物料/客户/供应商主数据 |
 | /drawings, /drawings/{id}/versions | 图纸与版本、水印预览、下载日志 |
 | /boms, /boms/{id}/versions, POST /bom-requests | BOM、版本、业务提交新建 BOM 申请（ENG-02） |
 | /routings | 工艺路线：工序、机台、夹位、每夹位时间、准备时间 |
@@ -47,15 +47,27 @@
 | POST /contracts, POST /contracts/{id}/review | 合同上传与跨部门合同评审 |
 | POST /sales-orders | 建业务订单，`type`: mold/sample/formal；阶梯价格行 |
 | POST /sales-orders/{id}/submit /manager-approve /finance-approve /review | 业务经理审核→财务审核→订单评审（逐节点计时） |
-| POST /sales-orders/{id}/tail-plan | 交付后尾数处理路径（返工补交/入库/直接入库/报废） |
 | GET /sales-orders/{id}/timeline | 订单全生命周期时间轴 |
 
-## hk-pricing
+## shipment（出货与客户对账单）
 
 | 端点 | 说明 |
 | --- | --- |
-| POST /hk-pricing/calculate | 输入价×70% 试算与适用性校验（仅 formal 且客户勾选） |
-| GET /hk-pricing/audits?orderId=… | 原价/计算价版本与审计表 |
+| ✅ GET /shipments | 出货单列表（客户/订单/状态/发货日期过滤），一单多产品 |
+| ✅ GET /shipments/{id} | 出货单详情，含明细与 SHP-01~06 节点计时 |
+| ✅ POST /shipments | 生成发货通知（SHP-01），每行必须关联订单行 |
+| ✅ POST /shipments/{id}/pick /pack | SHP-02 拣配出库、SHP-03 全检包装完成（T1） |
+| ✅ POST /shipments/{id}/ship | SHP-04 出运发货：**品质放行 + 财务信用双闸门**，失败项一次列全（ORD_2506） |
+| ✅ POST /shipments/{id}/sign /invoice | SHP-05 客户签收、SHP-06 开票回填 |
+| ✅ POST /shipments/{id}/close | 商业关闭，结案前做尾数数量平衡校验（ORD_2509） |
+| ✅ POST /shipments/tail-plan | 尾数四路径（返工补交/入库/直接入库/报废），返工路径发事件给 rework |
+| ✅ GET /statements/customer · /statements/{id} | 客户对账单列表与详情 |
+| ✅ POST /statements/generate | 按客户+期间从源单汇总；重算产出新版本，不改已发出的版本 |
+| ✅ POST /statements/{id}/send /confirm /dispute /settle | 对账流转；差异非零必须有说明才能发出（ORD_2602） |
+| ✅ PUT /statements/{id}/lines/{lineId}/matched | 客户核对状态——对账单上唯一可人工改的字段 |
+
+> 出货过账发 `sales.shipment.posted`（应收依据 + 逐行履约），contract-order 据此回写订单
+> 部分出货（EXECUTING）/ 全部出货（COMPLETED）；签收发 `sales.shipment.signed`。
 
 ## pmc / aps-loading
 

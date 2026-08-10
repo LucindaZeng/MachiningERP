@@ -1,0 +1,87 @@
+# ---------------------------------------------------------------------------
+# 本地完整运行栈：数据库 + 缓存 + 对象存储 + kkFileView 在线预览
+# 用法：docker compose -f infra/docker-compose.local.yml up -d
+#       然后 pnpm -F services/api start:dev / pnpm -F apps/web dev
+# 与 docker-compose.dev.yml 的区别：增加 kkFileView；服务共享同一网络，
+# kkFileView 通过服务名 minio 直接访问对象存储的预签名 URL。
+# ---------------------------------------------------------------------------
+name: machining-erp-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: machining-erp-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-erp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-erp_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-machining_erp}
+      TZ: Asia/Shanghai
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-erp} -d ${POSTGRES_DB:-machining_erp}']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: machining-erp-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: machining-erp-minio
+    restart: unless-stopped
+    command: ['server', '/data', '--console-address', ':9001']
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-erp}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-erp_dev_password}
+    ports:
+      - '9000:9000'
+      - '9001:9001'
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ['CMD', 'mc', 'ready', 'local']
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  kkfileview:
+    # 在线文件预览（PDF/Word/Excel/图片/CAD dwg-dxf/压缩包等）
+    image: keking/kkfileview:4.4.0
+    container_name: machining-erp-kkfileview
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      # 关闭 kkFileView 自带的演示上传页，只作为预览引擎使用（按所用版本核对变量名）
+      KK_FILE_UPLOAD_DISABLE: 'true'
+      # 对外基础路径；经 Nginx 反代时改为 https://<域名>/preview
+      KK_BASE_URL: ${KK_PREVIEW_BASE_URL:-http://localhost:8012}
+    ports:
+      - '8012:8012'
+    volumes:
+      - kkfileview-cache:/opt/kkFileView/file
+    # kkFileView 需能访问文件 URL：预签名 URL 必须以 http://minio:9000 为端点签发
+    depends_on:
+      - minio
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  kkfileview-cache:

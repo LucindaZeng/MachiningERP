@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 
 import { fetchQuotations } from '@/api/sales/quotation.api'
 import DocTimeline from '@/components/DocTimeline.vue'
+import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
 import {
   matchDateRange,
   matchEq,
@@ -14,6 +15,7 @@ import {
 import FilterBar from '@/components/FilterBar.vue'
 import { DOC_STATUS } from '@/components/status-dictionary'
 import StatusTag from '@/components/StatusTag.vue'
+import { useFilePreview } from '@/composables/use-file-preview'
 import { useResourceList } from '@/composables/use-resource-list'
 
 import { exportQuotations } from './quote-export'
@@ -130,6 +132,13 @@ function marginClass(rate: number): string {
 function goCostAnalysis(): void {
   void router.push('/sales/quotations?tab=cost')
 }
+const filePreview = useFilePreview()
+
+/** 报价环节上传的图纸版本；后续 BOM 与核价复用同一版，不重复上传 */
+function previewDrawing(versionId: string): void {
+  void filePreview.open('drawing-version', versionId)
+}
+
 </script>
 
 <template>
@@ -159,6 +168,16 @@ function goCostAnalysis(): void {
             合并导出所选（{{ selected.length }}）
           </el-button>
           <el-button size="small" :icon="Download" @click="exportAll">导出 Excel</el-button>
+    <FilePreviewDialog
+      v-model="filePreview.visible.value"
+      :loading="filePreview.loading.value"
+      :preview="filePreview.preview.value"
+      :unsupported="filePreview.unsupported.value"
+      :error-message="filePreview.errorMessage.value"
+      @close="filePreview.close"
+      @download="filePreview.download"
+    />
+
         </template>
       </FilterBar>
 
@@ -259,6 +278,15 @@ function goCostAnalysis(): void {
           <el-descriptions-item label="产品">{{ current.productName }}</el-descriptions-item>
           <el-descriptions-item label="图号 / 版本">
             {{ current.drawingNo }} · {{ current.drawingVersion }}
+            <el-button
+              v-if="current.drawingVersionId"
+              link
+              type="primary"
+              class="preview-link"
+              @click="previewDrawing(current.drawingVersionId)"
+            >
+              预览图纸
+            </el-button>
           </el-descriptions-item>
           <el-descriptions-item label="材料">{{ current.material }}</el-descriptions-item>
           <el-descriptions-item label="表面处理">{{ current.surfaceTreatment }}</el-descriptions-item>
@@ -343,6 +371,10 @@ function goCostAnalysis(): void {
 </template>
 
 <style scoped>
+.preview-link {
+  margin-left: 8px;
+}
+
 .rule-alert {
   margin-bottom: 14px;
 }

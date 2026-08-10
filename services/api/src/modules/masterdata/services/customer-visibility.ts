@@ -32,17 +32,13 @@ function bpsToRatio(bps: number): number {
 /**
  * 把仓储记录转成对外表示，并按权限裁剪字段。
  *
- * 两条硬规则：
- * 1. **香港 70% 价格是独立权限点**：未授予 `sales.hk-price.view` 的人，返回体里
- *    根本不出现 hk* 字段——不是给 false，而是**整组缺席**，这样列表、详情、报表与
- *    导出复用同一个出口时不可能漏出（业务规格 3.2）。
- * 2. 财务字段（税号、银行账号、授信、账龄）无 `customer.finance.view` 时打码，
- *    业务角色只读不可见明文。
+ * 硬规则：财务字段（税号、银行账号、授信、账龄）无 `customer.finance.view` 时打码，
+ * 业务角色只读不可见明文。列表、详情、报表与导出复用同一个出口，裁剪只此一处。
  */
 export function toCustomerView(record: CustomerRecord, viewer: Viewer): CustomerView {
   const canSeeFinance = has(viewer, PERMISSION_CODES.CUSTOMER_FINANCE_VIEW)
 
-  const view: CustomerView = {
+  return {
     id: record.id,
     code: record.code,
     name: record.name,
@@ -86,19 +82,6 @@ export function toCustomerView(record: CustomerRecord, viewer: Viewer): Customer
     updatedAt: record.updatedAt.toISOString(),
     version: record.version,
   }
-
-  if (has(viewer, PERMISSION_CODES.HK_PRICE_VIEW)) {
-    view.hk = {
-      pricingEnabled: record.hkPricingEnabled,
-      factor: bpsToRatio(record.hkFactorBps),
-      effectiveFrom: record.hkEffectiveFrom?.toISOString().slice(0, 10) ?? null,
-      appliedBy: record.hkAppliedBy,
-      approvedBy: record.hkApprovedBy,
-      changeReason: record.hkChangeReason,
-    }
-  }
-
-  return view
 }
 
 export function toCustomerViews(records: readonly CustomerRecord[], viewer: Viewer): CustomerView[] {

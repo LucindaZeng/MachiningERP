@@ -3,23 +3,12 @@ import type { CurrencyCode, Money } from '@machining-erp/shared'
 
 /**
  * 演示客户，与后端 `prisma/seeds/customers.seed.ts` 的三条种子数据一一对应，
- * 覆盖三种典型口径：香港代生产（勾选 70% 价格）、国外（无税号走英文报关资料）、
- * 国内（必填税号 + 专票）。
+ * 覆盖三种典型口径：香港代生产、国外（无税号走英文报关资料）、国内（必填税号 + 专票）。
  *
- * 视角设定为「有 sales.hk-price.view、无 customer.finance.view」的业务角色，
- * 因此 `hk` 分组下发，而税号 / 银行账号按后端 maskTail 规则只给后 4 位——
- * 让原型看到的裁剪结果与真实接口一致。
+ * 视角设定为「无 customer.finance.view」的业务角色，税号 / 银行账号按后端 maskTail
+ * 规则只给后 4 位——让原型看到的裁剪结果与真实接口一致。
  */
 const money = (amount: string, currency: CurrencyCode = 'CNY'): Money => ({ amount, currency })
-
-const NO_HK = {
-  pricingEnabled: false,
-  factor: 1,
-  effectiveFrom: null,
-  appliedBy: null,
-  approvedBy: null,
-  changeReason: null,
-}
 
 export const CUSTOMERS: Customer[] = [
   {
@@ -72,14 +61,6 @@ export const CUSTOMERS: Customer[] = [
       overdueAmount: money('0.00'),
       arDays: 60,
     },
-    hk: {
-      pricingEnabled: true,
-      factor: 0.7,
-      effectiveFrom: '2026-01-01',
-      appliedBy: 'WFX-2018-0042',
-      approvedBy: 'WFX-2016-0007',
-      changeReason: '香港代生产协议 2026 年续签',
-    },
     createdBy: 'SEED',
     updatedAt: '2026-07-28T09:30:00.000Z',
     version: 1,
@@ -126,7 +107,6 @@ export const CUSTOMERS: Customer[] = [
       overdueAmount: money('0.00', 'EUR'),
       arDays: 45,
     },
-    hk: NO_HK,
     createdBy: 'SEED',
     updatedAt: '2026-07-28T09:30:00.000Z',
     version: 1,
@@ -173,7 +153,6 @@ export const CUSTOMERS: Customer[] = [
       overdueAmount: money('0.00'),
       arDays: 30,
     },
-    hk: NO_HK,
     createdBy: 'SEED',
     updatedAt: '2026-07-28T09:30:00.000Z',
     version: 1,

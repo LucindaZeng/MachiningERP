@@ -1,15 +1,8 @@
 <script setup lang="ts">
 import { CHARGE_MODE, DOC_STATUS, ORDER_TYPE } from '@/components/status-dictionary'
 import StatusTag from '@/components/StatusTag.vue'
-import { usePermission } from '@/composables/use-permission'
 
 import type { SalesOrder } from '@/types/sales.types'
-
-/**
- * 香港 70% 是独立权限点：无权限者连「×0.7」标记都不能看到，
- * 与 HkPriceBreakdown 一样由组件自己读权限，避免父页逐层透传。
- */
-const { canViewHkPrice } = usePermission()
 
 defineProps<{
   rows: SalesOrder[]
@@ -66,18 +59,7 @@ function openDetail(row: SalesOrder): void {
     </el-table-column>
     <el-table-column prop="quantity" label="数量" width="80" align="right" />
     <el-table-column label="单价" width="130" align="right">
-      <template #default="{ row }">
-        <span>{{ row.unitPrice }} {{ row.currency }}</span>
-        <el-tag
-          v-if="row.hk.applied && canViewHkPrice"
-          size="small"
-          type="warning"
-          effect="plain"
-          class="hk-tag"
-        >
-          ×0.7
-        </el-tag>
-      </template>
+      <template #default="{ row }">{{ row.unitPrice }} {{ row.currency }}</template>
     </el-table-column>
     <el-table-column label="金额" width="120" align="right">
       <template #default="{ row }">{{ row.amount }}</template>
@@ -140,10 +122,6 @@ function openDetail(row: SalesOrder): void {
 .doc-no {
   font-weight: 600;
   color: var(--wfx-navy);
-}
-
-.hk-tag {
-  margin-left: 6px;
 }
 
 .muted {

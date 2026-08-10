@@ -680,15 +680,6 @@ model Customer {
   tradeTerm   String?          @map("trade_term") @db.VarChar(64)
   level       String?          @db.VarChar(32)
 
-  /// 香港 70% 价格：**独立权限点**，未授权者在列表/详情/报表/导出中一律看不到以下字段
-  hkPricingEnabled Boolean   @default(false) @map("hk_pricing_enabled")
-  /// 折算系数按万分比存整数（7000 = 70%），避免浮点
-  hkFactorBps      Int       @default(10000) @map("hk_factor_bps")
-  hkEffectiveFrom  DateTime? @map("hk_effective_from")
-  hkAppliedBy      String?   @map("hk_applied_by") @db.VarChar(32)
-  hkApprovedBy     String?   @map("hk_approved_by") @db.VarChar(32)
-  hkChangeReason   String?   @map("hk_change_reason") @db.VarChar(255)
-
   status     CustomerStatus @default(DRAFT)
   approvedBy String?        @map("approved_by") @db.VarChar(32)
   approvedAt DateTime?      @map("approved_at")
@@ -734,7 +725,7 @@ model CustomerDeliveryAddress {
   @@map("customer_delivery_addresses")
 }
 
-/// 敏感字段（银行账号、付款条件、香港 70% 勾选等）变更申请：留痕并按权限审批后才生效
+/// 敏感字段（银行账号、付款条件等）变更申请：留痕并按权限审批后才生效
 model CustomerChangeRequest {
   id         String        @id @default(uuid()) @db.Uuid
   requestNo  String        @unique @map("request_no") @db.VarChar(32)
@@ -1091,4 +1082,911 @@ model QuoteChangeRequest {
 
   @@index([quotationId, status])
   @@map("quote_change_requests")
+}
+
+// ───────────────────────────── 公司基础资料（example/基础资料工艺车间仓库ByCoder.xls）
+// 业务部模块直接引用，不在业务部内另建平行表（业务规格「主数据引用」）。
+
+/// 工艺性质：厂内自制 / 委外加工
+enum ProcessNature {
+  IN_HOUSE
+  OUTSOURCED
+
+  @@map("process_nature")
+}
+
+/// 工艺基础表。成本分析的可加减工艺列、订单追踪的节点、报价工艺组合匹配都从这里取值。
+model ProcessDefinition {
+  /// 工艺编号（10=CNC、11=车床、12=切料…），来源 xls，不重排
+  code           String        @id @db.VarChar(8)
+  name           String        @db.VarChar(64)
+  nature         ProcessNature
+  /// 生产单位（一部车间/车床车间/后工序车间/委外表处…）
+  productionUnit String        @map("production_unit") @db.VarChar(32)
+  /// 责任部门，订单追踪节点按此显示
+  department     String?       @db.VarChar(32)
+  /// 展示与默认工艺路线的排序
+  sequence       Int
+  active         Boolean       @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([nature, sequence])
+  @@map("process_definitions")
+}
+
+/// 仓库表。备料完工入成品仓 100，样品入样品仓 400。
+model WarehouseDefinition {
+  code        String  @id @db.VarChar(8)
+  name        String  @db.VarChar(64)
+  category    String  @db.VarChar(32)
+  /// 是否纳入 LRP 计算
+  lrpIncluded Boolean @default(false) @map("lrp_included")
+  stockType   String? @map("stock_type") @db.VarChar(32)
+  remark      String? @db.VarChar(255)
+  active      Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("warehouse_definitions")
+}
+
+/// 车间表，订单追踪节点的责任车间由此对应。
+model WorkshopDefinition {
+  code     String  @id @db.VarChar(8)
+  name     String  @db.VarChar(64)
+  /// 与工艺表的 productionUnit 对齐（一部车间/车床车间/后工序车间…）
+  unitName String  @map("unit_name") @db.VarChar(32)
+  remark   String? @db.VarChar(255)
+  active   Boolean @default(true)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("workshop_definitions")
+}
+
+// ───────────────────────────── contract-order（订单管理，业务规格第 4 章）
+
+/// 五种下单动作里的四种订单类型；「订单修改申请」是独立单据而非订单类型。
+enum SalesOrderType {
+  /// 正常业务订单（批量）
+  FORMAL
+  /// 样品订单：无 BOM、无成品品号，入样品仓 400
+  SAMPLE
+  /// 模具订单：只填要求完成时间，不设完成/未完成状态
+  MOLD
+  /// 备料订单：无交货义务，全部完工入库即完成，须总经办批准
+  STOCK_PREP
+
+  @@map("sales_order_type")
+}
+
+/// 收费方式。正式订单强制收费；免费/部分收费须补齐费用承担方、预计成本与原因。
+enum ChargeMode {
+  CHARGED
+  FREE
+  PARTIAL
+  /// 递延至正式订单分摊
+  DEFERRED
+  /// 押金 / 达量返还
+  DEPOSIT
+  /// 内部备料，不计客户应收
+  INTERNAL
+
+  @@map("charge_mode")
+}
+
+/// 订单审核链：业务经理 → 财务 → 跨部门订单评审；备料订单额外经总经办。
+enum SalesOrderStatus {
+  DRAFT
+  /// 待业务经理审核（T0 从提交起算）
+  MANAGER_REVIEW
+  /// 待财务审核
+  FINANCE_REVIEW
+  /// 待总经办审批（仅备料订单，无论金额大小）
+  GM_REVIEW
+  /// 待跨部门订单评审
+  CROSS_REVIEW
+  APPROVED
+  EXECUTING
+  COMPLETED
+  CLOSED
+  REJECTED
+  VOID
+
+  @@map("sales_order_status")
+}
+
+/// 备料库存的生命周期：生产中 → 已入库可领用 → 已用完
+enum StockPrepStatus {
+  PRODUCING
+  STOCKED
+  CONSUMED
+
+  @@map("stock_prep_status")
+}
+
+model SalesOrder {
+  id        String @id @default(uuid()) @db.Uuid
+  docNo     String @unique @map("doc_no") @db.VarChar(32)
+
+  customerId   String         @map("customer_id") @db.Uuid
+  orderType    SalesOrderType @map("order_type")
+  chargeMode   ChargeMode     @map("charge_mode")
+
+  /// 客户原始订单号与原件附件：模具/正式一律必填，收费样品也必填
+  customerPoNo   String? @map("customer_po_no") @db.VarChar(64)
+  customerPoFile String? @map("customer_po_file") @db.VarChar(255)
+
+  currency String @default("CNY") @db.VarChar(8)
+  /// 税率按万分比整数存，避开浮点
+  taxRateBps Int  @default(1300) @map("tax_rate_bps")
+
+  /// 备料订单没有客户交期，改填内部要求完成时间
+  internalDueDate DateTime? @map("internal_due_date")
+
+  /// 免费/部分收费时必填的三要素
+  costOwner        String? @map("cost_owner") @db.VarChar(64)
+  freeReason       String? @map("free_reason") @db.VarChar(255)
+  estimatedCostMinor BigInt? @map("estimated_cost_minor")
+
+  status      SalesOrderStatus @default(DRAFT)
+  /// 审批链 T0：提交时刻，用于各节点时长统计
+  submittedAt DateTime? @map("submitted_at")
+  submittedBy String?   @map("submitted_by") @db.VarChar(32)
+  approvedAt  DateTime? @map("approved_at")
+  rejectReason String?  @map("reject_reason") @db.VarChar(500)
+
+  /// 备料订单专用：完工入库数量，达到订单数量即视为完成
+  stockedQty Decimal? @map("stocked_qty") @db.Decimal(18, 6)
+  /// 备料库存状态，仅 STOCK_PREP 有值
+  stockStatus StockPrepStatus? @map("stock_status")
+
+  lines         SalesOrderLine[]
+  changeRequests OrderChangeRequest[]
+  /// 本单作为备料单被哪些正式订单领用
+  consumptions  StockConsumption[] @relation("StockPrepSource")
+
+  createdBy String?  @map("created_by") @db.VarChar(32)
+  updatedBy String?  @map("updated_by") @db.VarChar(32)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  versionLock Int    @default(0) @map("version_lock")
+
+  @@index([customerId, orderType, status])
+  @@index([status, submittedAt])
+  @@map("sales_orders")
+}
+
+/// 订单明细行。一张订单可下多项产品，每行独立数量、单价与交期跟踪。
+model SalesOrderLine {
+  id      String @id @default(uuid()) @db.Uuid
+  orderId String @map("order_id") @db.Uuid
+  sequence Int
+
+  /// 报价单行来源：环环相扣，必须有生效报价才能下单
+  quotationId     String? @map("quotation_id") @db.Uuid
+  quotationItemId String? @map("quotation_item_id") @db.Uuid
+  costAnalysisId  String? @map("cost_analysis_id") @db.Uuid
+
+  productName String  @map("product_name") @db.VarChar(128)
+  drawingNo   String  @map("drawing_no") @db.VarChar(128)
+  drawingVersionId String? @map("drawing_version_id") @db.Uuid
+  revision    String? @db.VarChar(32)
+  /// 10 位物料码：成品 10+客户4+机种4；样品 12+客户4+流水4；模具 19 段
+  itemCode    String? @map("item_code") @db.VarChar(16)
+  /// BOM 申请：样品单除外，正式单下单前必须已确认
+  bomRequestNo String? @map("bom_request_no") @db.VarChar(32)
+
+  quantity  Decimal @db.Decimal(18, 6)
+  /// 客户原始单价
+  unitPriceMinor BigInt @map("unit_price_minor")
+  /// 客户交期；备料订单为空
+  deliveryDate DateTime? @map("delivery_date")
+  remark    String? @db.VarChar(255)
+
+  order        SalesOrder        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  consumptions StockConsumption[]
+  trackingNodes OrderTrackingNode[]
+
+  @@unique([orderId, sequence])
+  @@index([drawingNo])
+  @@map("sales_order_lines")
+}
+
+/// 正式订单领用备料库存的履历：剩余数量与被哪张正式订单消耗全程可查。
+model StockConsumption {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// 被领用的备料订单
+  stockOrderId String @map("stock_order_id") @db.Uuid
+  /// 领用方的正式订单行
+  orderLineId  String @map("order_line_id") @db.Uuid
+
+  consumedQty Decimal @map("consumed_qty") @db.Decimal(18, 6)
+  /// 快照：备料单件成本与本单新产单件成本，加权结果不再随后续改动漂移
+  stockUnitCostMinor   BigInt @map("stock_unit_cost_minor")
+  produceQty           Decimal @map("produce_qty") @db.Decimal(18, 6)
+  produceUnitCostMinor BigInt @map("produce_unit_cost_minor")
+  /// 加权平均单件成本 =（备料成本×领用数 + 新产成本×新产数）÷ 订单数量
+  blendedUnitCostMinor BigInt @map("blended_unit_cost_minor")
+  currency             String @default("CNY") @db.VarChar(8)
+
+  stockOrder SalesOrder     @relation("StockPrepSource", fields: [stockOrderId], references: [id])
+  orderLine  SalesOrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+
+  createdBy String?  @map("created_by") @db.VarChar(32)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([stockOrderId])
+  @@unique([orderLineId, stockOrderId])
+  @@map("stock_consumptions")
+}
+
+/// 订单修改申请：只改数量、交期等订单信息；价格与下单产品锁定。
+enum OrderChangeType {
+  QUANTITY
+  DELIVERY
+  SHIP_TO
+  PACKING
+  CANCEL
+
+  @@map("order_change_type")
+}
+
+enum OrderChangeStatus {
+  SUBMITTED
+  REVIEWING
+  APPROVED
+  REJECTED
+
+  @@map("order_change_status")
+}
+
+model OrderChangeRequest {
+  id        String @id @default(uuid()) @db.Uuid
+  requestNo String @unique @map("request_no") @db.VarChar(32)
+  orderId   String @map("order_id") @db.Uuid
+  /// 针对某一行；为空表示整单
+  orderLineId String? @map("order_line_id") @db.Uuid
+
+  changeType OrderChangeType @map("change_type")
+  origin     String          @db.VarChar(16)
+  urgent     Boolean         @default(false)
+
+  beforeValue String @map("before_value") @db.VarChar(255)
+  afterValue  String @map("after_value") @db.VarChar(255)
+  reason      String @db.VarChar(500)
+  costOwner   String? @map("cost_owner") @db.VarChar(64)
+
+  status      OrderChangeStatus @default(SUBMITTED)
+  submittedBy String            @map("submitted_by") @db.VarChar(32)
+  submittedAt DateTime          @default(now()) @map("submitted_at")
+  handledBy   String?           @map("handled_by") @db.VarChar(32)
+  handledAt   DateTime?         @map("handled_at")
+  rejectReason String?          @map("reject_reason") @db.VarChar(500)
+
+  order SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  versionLock Int    @default(0) @map("version_lock")
+
+  @@index([orderId, status])
+  @@map("order_change_requests")
+}
+
+/// 追踪节点状态。一律由事件推导，不接受手工填报。
+enum TrackNodeStatus {
+  PENDING
+  ACTIVE
+  DONE
+  BLOCKED
+
+  @@map("track_node_status")
+}
+
+/// 订单追踪节点。起点是订单评审，节点链按产品工艺路线自动裁剪。
+model OrderTrackingNode {
+  id          String @id @default(uuid()) @db.Uuid
+  orderLineId String @map("order_line_id") @db.Uuid
+
+  sequence Int
+  /// 关联工艺基础表；订单评审、PMC 计划这类非工艺节点为空
+  processCode String? @map("process_code") @db.VarChar(8)
+  node        String  @db.VarChar(64)
+  phase       String  @db.VarChar(32)
+  department  String  @db.VarChar(32)
+
+  status TrackNodeStatus @default(PENDING)
+  /// 进度一律「完成数/工单数」，绝不存百分比
+  qtyIn  Decimal? @map("qty_in") @db.Decimal(18, 6)
+  qtyOk  Decimal? @map("qty_ok") @db.Decimal(18, 6)
+  qtyNg  Decimal? @map("qty_ng") @db.Decimal(18, 6)
+
+  startedAt  DateTime? @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  remark     String?   @db.VarChar(255)
+
+  orderLine SalesOrderLine @relation(fields: [orderLineId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([orderLineId, sequence])
+  @@index([status])
+  @@map("order_tracking_nodes")
+}
+
+// ───────────────────────────── bom-request（BOM 申请，业务规格第 5 章 / ENG-02、ENG-05）
+
+/// 申请用途。样品既不建 BOM 也不建品号，因此没有 sample 这一项。
+enum BomProductionType {
+  /// 正式量产：建品号 + BOM + 工艺路线
+  BATCH
+  /// 模具：建模具编号，不建品号（模具不是可售产品）
+  MOLD
+
+  @@map("bom_production_type")
+}
+
+enum BomRequestStatus {
+  DRAFT
+  /// 已提交，待工程接收
+  SUBMITTED
+  /// 工程已接收，建立中
+  CLAIMED
+  /// 工程退回补料，退回等待时长累计
+  RETURNED
+  /// BOM 已建立，可下单（程序可能仍未完成）
+  BOM_DONE
+  /// BOM 与程序均完成
+  ALL_DONE
+  /// 已据此下单
+  ORDERED
+
+  @@map("bom_request_status")
+}
+
+/// BOM 申请。图纸由报价环节上传的版本自动带入，**不重复上传**（业务规格第 5 章）。
+model BomRequest {
+  id    String @id @default(uuid()) @db.Uuid
+  docNo String @unique @map("doc_no") @db.VarChar(32)
+
+  customerId String  @map("customer_id") @db.Uuid
+  /// 直接引用报价单内的产品：名称图号、版本、材质自动带入
+  quotationId     String? @map("quotation_id") @db.Uuid
+  quotationItemId String? @map("quotation_item_id") @db.Uuid
+  customerPoNo    String? @map("customer_po_no") @db.VarChar(64)
+
+  productName      String @map("product_name") @db.VarChar(128)
+  drawingNo        String @map("drawing_no") @db.VarChar(128)
+  /// 图纸库版本；来自报价环节，工程与报价共用同一份
+  drawingVersionId String? @map("drawing_version_id") @db.Uuid
+  drawingVersion   String  @map("drawing_version") @db.VarChar(32)
+  material         String  @db.VarChar(64)
+  surfaceTreatment String  @map("surface_treatment") @db.VarChar(64)
+  inspection       String  @db.VarChar(128)
+  packing          String  @db.VarChar(128)
+
+  quantity           Decimal   @db.Decimal(18, 6)
+  targetDeliveryDate DateTime? @map("target_delivery_date")
+
+  productionType BomProductionType @map("production_type")
+  /// 由样品转量产时回填的样品订单号，用于把试做工时带入首次量产
+  fromSampleNo        String? @map("from_sample_no") @db.VarChar(32)
+  specialRequirement  String? @map("special_requirement") @db.VarChar(500)
+
+  status BomRequestStatus @default(DRAFT)
+  /// 申请人（业务员），完成时通知回这个人
+  ownerUserCode String  @map("owner_user_code") @db.VarChar(32)
+  submittedAt   DateTime? @map("submitted_at")
+  claimedAt     DateTime? @map("claimed_at")
+  claimedBy     String?   @map("claimed_by") @db.VarChar(32)
+  /// 工程退回累计等待毫秒数；退回重提时累加，用于时效分析
+  returnedMs    BigInt    @default(0) @map("returned_ms")
+  returnedAt    DateTime? @map("returned_at")
+  returnReason  String?   @map("return_reason") @db.VarChar(500)
+
+  /// ENG-05 双状态：**必须分别落库、分别展示**，不得合并成一个「全部工程完成」
+  bomReady     Boolean @default(false) @map("bom_ready")
+  programReady Boolean @default(false) @map("program_ready")
+  bomReadyAt     DateTime? @map("bom_ready_at")
+  programReadyAt DateTime? @map("program_ready_at")
+
+  /// 工程建立的编码：BATCH 时是品号，MOLD 时是模具编号
+  productCode String? @map("product_code") @db.VarChar(16)
+
+  createdBy String?  @map("created_by") @db.VarChar(32)
+  updatedBy String?  @map("updated_by") @db.VarChar(32)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  versionLock Int    @default(0) @map("version_lock")
+
+  @@index([customerId, status])
+  @@index([status, submittedAt])
+  @@index([drawingNo])
+  @@map("bom_requests")
+}
+
+// ───────────────────────────── shipment（出货管理 + 客户对账单，业务规格第 7 章）
+
+/// 出货单状态。与前端 `ShipmentStatus` 七态一一对应，界面是设计基线。
+enum ShipmentStatus {
+  /// 已生成发货通知，等待仓库拣配（SHP-01）
+  PLANNED
+  /// 仓库拣配出库中（SHP-02）
+  PICKING
+  /// 全检合格并包装完成，T1 从此刻起算（SHP-03）
+  PACKED
+  /// 已出运发货（SHP-04）；过此闸门需品质放行 + 财务信用双通过
+  SHIPPED
+  /// 客户已签收（SHP-05）
+  SIGNED
+  /// 已开票（SHP-06）
+  INVOICED
+  /// 商业关闭；结案前做尾数数量平衡校验
+  CLOSED
+
+  @@map("shipment_status")
+}
+
+/// 尾数四路径（V2.4 尾数规则）。除这四种外不存在第五种处置方式。
+enum TailPlan {
+  /// 返工补交：拆返工子订单，重新核算重复工序成本
+  REWORK
+  /// 入库待后续订单：占用尾数库存，保留期满转呆滞
+  STOCK
+  /// 直接入库：客户已确认不再补交
+  DIRECT_STOCK
+  /// 报废：需品质与财务确认损失归属
+  SCRAP
+
+  @@map("tail_plan")
+}
+
+/// 销货出运单。一张出货单可包含多项产品，各行关联各自订单行。
+model Shipment {
+  id    String @id @default(uuid()) @db.Uuid
+  docNo String @unique @map("doc_no") @db.VarChar(32)
+
+  orderId    String @map("order_id") @db.Uuid
+  customerId String @map("customer_id") @db.Uuid
+
+  /// 收货地址取自客户档案的送货地址，不在出货单上另建地址簿
+  deliveryAddressId String? @map("delivery_address_id") @db.Uuid
+
+  currency   String  @default("CNY") @db.VarChar(8)
+  carrier    String? @db.VarChar(128)
+  trackingNo String? @map("tracking_no") @db.VarChar(64)
+  /// 财务开票后回填，供对账单勾稽
+  invoiceNo  String? @map("invoice_no") @db.VarChar(32)
+
+  /// 无偿补发：这一票是为某张 RMA 补货的（业务规格第 8 章「补发不另收费」）。
+  /// 非空时**不计入对账单的发货列**——补发已经在原发货里收过一次钱了，
+  /// 再计一次等于向客户重复收费。
+  replacesReturnId String? @map("replaces_return_id") @db.Uuid
+
+  status        ShipmentStatus @default(PLANNED)
+  ownerUserCode String         @map("owner_user_code") @db.VarChar(32)
+
+  packedAt   DateTime? @map("packed_at")
+  shippedAt  DateTime? @map("shipped_at")
+  signedAt   DateTime? @map("signed_at")
+  invoicedAt DateTime? @map("invoiced_at")
+  closedAt   DateTime? @map("closed_at")
+
+  lines ShipmentLine[]
+
+  createdBy   String?  @map("created_by") @db.VarChar(32)
+  updatedBy   String?  @map("updated_by") @db.VarChar(32)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  versionLock Int      @default(0) @map("version_lock")
+
+  @@index([customerId, status])
+  @@index([orderId])
+  @@index([status, shippedAt])
+  @@map("shipments")
+}
+
+/// 出货明细行。尾数 = 订单数 − 已发数，处置后记录已结清数量供结案平衡校验。
+model ShipmentLine {
+  id         String @id @default(uuid()) @db.Uuid
+  shipmentId String @map("shipment_id") @db.Uuid
+  sequence   Int
+
+  /// 关联的订单行；发货后按行回写已发数量与订单状态
+  orderLineId String @map("order_line_id") @db.Uuid
+
+  productName String  @map("product_name") @db.VarChar(128)
+  drawingNo   String  @map("drawing_no") @db.VarChar(128)
+  itemCode    String? @map("item_code") @db.VarChar(16)
+  batchNo     String  @map("batch_no") @db.VarChar(64)
+
+  /// 订单需求数 / 全检合格数 / 包装数 / 本次发货数
+  orderedQty   Decimal @map("ordered_qty") @db.Decimal(18, 6)
+  qualifiedQty Decimal @map("qualified_qty") @db.Decimal(18, 6)
+  packedQty    Decimal @map("packed_qty") @db.Decimal(18, 6)
+  shippedQty   Decimal @map("shipped_qty") @db.Decimal(18, 6)
+
+  unitPriceMinor BigInt @map("unit_price_minor")
+
+  /// 尾数处置：四路径之一 + 已结清数量，结案时校验 ordered = shipped + resolved
+  tailPlan        TailPlan? @map("tail_plan")
+  tailResolvedQty Decimal   @default(0) @map("tail_resolved_qty") @db.Decimal(18, 6)
+  tailApprovedBy  String?   @map("tail_approved_by") @db.VarChar(32)
+  tailApprovedAt  DateTime? @map("tail_approved_at")
+  tailRemark      String?   @map("tail_remark") @db.VarChar(500)
+
+  shipment Shipment @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+
+  @@unique([shipmentId, sequence])
+  @@index([orderLineId])
+  @@index([drawingNo])
+  @@map("shipment_lines")
+}
+
+/// 对账单状态。争议（DISPUTED）不是终点：差异回到源单处理后重新发出。
+enum StatementStatus {
+  DRAFT
+  SENT
+  CONFIRMED
+  DISPUTED
+  SETTLED
+
+  @@map("statement_status")
+}
+
+/// 对账明细行的单据类型；前端展示为 发货 / 开票 / 回款 / 退货 / 折让。
+enum StatementLineType {
+  SHIPMENT
+  INVOICE
+  RECEIPT
+  RETURN
+  ALLOWANCE
+
+  @@map("statement_line_type")
+}
+
+/// 客户对账单：按客户与期间从源单汇总，金额业务不得手工修改。
+/// 重算生成新版本（version 递增），已发出的版本原样保留。
+model Statement {
+  id    String @id @default(uuid()) @db.Uuid
+  docNo String @unique @map("doc_no") @db.VarChar(32)
+
+  customerId String   @map("customer_id") @db.Uuid
+  periodFrom DateTime @map("period_from") @db.Date
+  periodTo   DateTime @map("period_to") @db.Date
+  currency   String   @default("CNY") @db.VarChar(8)
+  /// 重算版本号，从 1 起；同一客户同一期间可以有多版
+  version    Int      @default(1)
+
+  openingBalanceMinor BigInt @map("opening_balance_minor")
+  shippedAmountMinor  BigInt @map("shipped_amount_minor")
+  invoicedAmountMinor BigInt @map("invoiced_amount_minor")
+  receivedAmountMinor BigInt @map("received_amount_minor")
+  returnAmountMinor   BigInt @map("return_amount_minor")
+  closingBalanceMinor BigInt @map("closing_balance_minor")
+
+  /// 与客户账面的差异；非零时 differenceNote 必填
+  differenceAmountMinor BigInt  @map("difference_amount_minor")
+  differenceNote        String? @map("difference_note") @db.VarChar(500)
+  overdueAmountMinor    BigInt  @map("overdue_amount_minor")
+
+  status        StatementStatus @default(DRAFT)
+  ownerUserCode String          @map("owner_user_code") @db.VarChar(32)
+  sentAt        DateTime?       @map("sent_at")
+  confirmedAt   DateTime?       @map("confirmed_at")
+
+  lines StatementLine[]
+
+  createdBy   String?  @map("created_by") @db.VarChar(32)
+  updatedBy   String?  @map("updated_by") @db.VarChar(32)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  versionLock Int      @default(0) @map("version_lock")
+
+  @@unique([customerId, periodFrom, periodTo, version])
+  @@index([customerId, status])
+  @@map("statements")
+}
+
+/// 对账明细行。金额由源单带出，客户核对状态（matched）是唯一可改字段。
+model StatementLine {
+  id          String @id @default(uuid()) @db.Uuid
+  statementId String @map("statement_id") @db.Uuid
+  sequence    Int
+
+  occurredAt  DateTime          @map("occurred_at") @db.Date
+  type        StatementLineType
+  docNo       String            @map("doc_no") @db.VarChar(32)
+  productName String?           @map("product_name") @db.VarChar(128)
+  quantity    Decimal?          @db.Decimal(18, 6)
+  /// 回款与退货折让为负数，直接相加即得期末余额
+  amountMinor BigInt            @map("amount_minor")
+  matched     Boolean           @default(false)
+  remark      String?           @db.VarChar(255)
+
+  statement Statement @relation(fields: [statementId], references: [id], onDelete: Cascade)
+
+  @@unique([statementId, sequence])
+  @@index([docNo])
+  @@map("statement_lines")
+}
+
+// ───────────────────────────── invoice-request（发票申请，业务规格第 9 章）
+
+/// 发票种类。与前端 `InvoiceType` 一一对应。
+enum InvoiceKind {
+  /// 增值税专用发票
+  SPECIAL
+  /// 增值税普通发票
+  GENERAL
+  /// 出口发票（零税率）
+  EXPORT
+  /// 形式发票 Proforma
+  PROFORMA
+
+  @@map("invoice_kind")
+}
+
+/// 正票与红字发票共用一张表：红冲就是「带负号且挂着父单」的发票申请。
+/// 一套状态机、一条编号流、一个列表端点，前端不用为红冲另做一套。
+enum InvoiceDocKind {
+  INVOICE
+  CREDIT_NOTE
+
+  @@map("invoice_doc_kind")
+}
+
+/// 走共享 DocStatus 的取值，不另造一套词汇：
+/// SUBMITTED=待复核，REVIEWING=财务开票中，COMPLETED=已开票交付。
+/// 寄出与签收**不是状态**，是 COMPLETED 之后的两个时间戳事件。
+enum InvoiceRequestStatus {
+  DRAFT
+  SUBMITTED
+  REVIEWING
+  COMPLETED
+  REJECTED
+  VOID
+
+  @@map("invoice_request_status")
+}
+
+/// 发票申请。业务按已签收出货单发起，财务开票并回写发票号。
+model InvoiceRequest {
+  id    String @id @default(uuid()) @db.Uuid
+  docNo String @unique @map("doc_no") @db.VarChar(32)
+
+  kind       InvoiceDocKind @default(INVOICE)
+  /// 红字发票指向被红冲的正票；正票为空
+  originalId String?        @map("original_id") @db.Uuid
+
+  customerId String      @map("customer_id") @db.Uuid
+  invoiceKind InvoiceKind @map("invoice_kind")
+  /// 按期间开票时关联的对账单
+  statementId String?    @map("statement_id") @db.Uuid
+
+  currency          String @default("CNY") @db.VarChar(8)
+  amountExTaxMinor  BigInt @map("amount_ex_tax_minor")
+  taxAmountMinor    BigInt @map("tax_amount_minor")
+  amountIncTaxMinor BigInt @map("amount_inc_tax_minor")
+
+  /// 开票信息，建单时从客户档案带出后冻结——客户档案后来改了不该改动已开的票
+  title       String  @db.VarChar(191)
+  taxNo       String  @map("tax_no") @db.VarChar(64)
+  bankAccount String? @map("bank_account") @db.VarChar(191)
+  address     String? @db.VarChar(255)
+
+  deliveryMethod String @map("delivery_method") @db.VarChar(32)
+  deliveryTarget String @map("delivery_target") @db.VarChar(191)
+
+  /// 出货 / 对账 / 申请三方金额是否一致；不一致禁止送财务开票
+  amountMatched Boolean @default(true) @map("amount_matched")
+  matchNote     String? @map("match_note") @db.VarChar(500)
+
+  expectedPaymentDate DateTime? @map("expected_payment_date")
+
+  status        InvoiceRequestStatus @default(DRAFT)
+  ownerUserCode String               @map("owner_user_code") @db.VarChar(32)
+  submittedAt   DateTime?            @map("submitted_at")
+
+  /// 财务回写
+  invoiceNo String?   @map("invoice_no") @db.VarChar(64)
+  issuedAt  DateTime? @map("issued_at")
+  /// 寄出与签收：状态仍是 COMPLETED，这两个只推进时间线
+  sentAt    DateTime? @map("sent_at")
+  signedAt  DateTime? @map("signed_at")
+
+  /// 作废（未开票前）与红冲（已开票后）都必须写明理由
+  reasonText String? @map("reason_text") @db.VarChar(500)
+
+  lines       InvoiceRequestLine[]
+  original    InvoiceRequest?      @relation("CreditNoteOf", fields: [originalId], references: [id])
+  creditNotes InvoiceRequest[]     @relation("CreditNoteOf")
+
+  createdBy   String?  @map("created_by") @db.VarChar(32)
+  updatedBy   String?  @map("updated_by") @db.VarChar(32)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  versionLock Int      @default(0) @map("version_lock")
+
+  @@index([customerId, status])
+  @@index([status, issuedAt])
+  @@index([originalId])
+  @@map("invoice_requests")
+}
+
+/// 发票明细行。逐行挂在出货单上，金额与出货一致是硬规则。
+model InvoiceRequestLine {
+  id        String @id @default(uuid()) @db.Uuid
+  invoiceId String @map("invoice_id") @db.Uuid
+  sequence  Int
+
+  shipmentId String? @map("shipment_id") @db.Uuid
+  shipmentNo String  @map("shipment_no") @db.VarChar(32)
+
+  productName String @map("product_name") @db.VarChar(128)
+  drawingNo   String @map("drawing_no") @db.VarChar(128)
+
+  quantity       Decimal @db.Decimal(18, 6)
+  unitPriceMinor BigInt  @map("unit_price_minor")
+  amountMinor    BigInt  @map("amount_minor")
+  /// 税率按万分比存整数（1300 = 13%）
+  taxRateBps     Int     @map("tax_rate_bps")
+  taxAmountMinor BigInt  @map("tax_amount_minor")
+
+  invoice InvoiceRequest @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@unique([invoiceId, sequence])
+  @@index([shipmentId])
+  @@map("invoice_request_lines")
+}
+
+/// 销退 / RMA 状态（业务规格第 8 章，与前端 ReturnStatus 一一对应）。
+/// REJECTED = 客诉不成立，是终点；DISPOSITION 是处置方案审批中。
+enum SalesReturnStatus {
+  REGISTERED
+  QUALITY_JUDGING
+  DISPOSITION
+  EXECUTING
+  CLOSED
+  REJECTED
+
+  @@map("sales_return_status")
+}
+
+/// 责任归属。**逐行判定**：一张 RMA 里本厂加工不良与委外表处不良可以同时存在，
+/// 一个单头字段说不清这件事，分析报表也是按批（= 行）统计的。
+enum ReturnResponsibility {
+  COMPANY
+  CUSTOMER
+  SUPPLIER
+  UNDECIDED
+
+  @@map("return_responsibility")
+}
+
+/// 处置方式。**逐行**，与前端 DISPOSITION 字典同集合。
+/// 客户 8D 不在这里——8D 是并行的品质流程（见 SalesReturn.eightDNo），
+/// 可以伴随任何一种处置；物理退货入库也不在这里，那是仓储事实（见 receivedAt）。
+enum ReturnDisposition {
+  REFUND
+  REPLACEMENT
+  REWORK
+  CONCESSION
+  SCRAP
+  UNDECIDED
+
+  @@map("return_disposition")
+}
+
+/// 客诉 / 退货单（RMA）。关联原订单与原出货批次，一张单可退多项产品。
+///
+/// 单头**不存**责任归属与处置方式：那两个字段逐行判定，单头展示值由 DTO
+/// 映射器按「全行一致取该值，否则标记为按行」现算——存一份派生值只会腐坏。
+model SalesReturn {
+  id    String @id @default(uuid()) @db.Uuid
+  docNo String @unique @map("doc_no") @db.VarChar(32)
+
+  orderId    String  @map("order_id") @db.Uuid
+  shipmentId String? @map("shipment_id") @db.Uuid
+  customerId String  @map("customer_id") @db.Uuid
+
+  currency String @default("CNY") @db.VarChar(8)
+
+  /// 客诉摘要（单头层面的一句话描述）；逐行的具体不良写在行上
+  reason String @db.VarChar(500)
+
+  /// 8D 是与处置正交的品质流程轨道，可伴随任意处置组合
+  eightDNo       String?  @map("eight_d_no") @db.VarChar(32)
+  eightDRequired Boolean  @default(false) @map("eight_d_required")
+
+  status        SalesReturnStatus @default(REGISTERED)
+  ownerUserCode String            @map("owner_user_code") @db.VarChar(32)
+
+  complaintAt DateTime  @map("complaint_at")
+  /// 首次响应时间，SLA 统计口径
+  respondedAt DateTime? @map("responded_at")
+  /// 品质判定完成
+  judgedAt    DateTime? @map("judged_at")
+  judgedBy    String?   @map("judged_by") @db.VarChar(32)
+  /// 处置方案审批
+  approvedAt  DateTime? @map("approved_at")
+  approvedBy  String?   @map("approved_by") @db.VarChar(32)
+  /// **结案即入账**：对账单的退货折让列按 closedAt 所在期间计入，
+  /// 同时锁死各行金额与处置——之后要更正只能另开单据。
+  closedAt    DateTime? @map("closed_at")
+
+  /// 涉及退款 / 让步 / 补货时按控制矩阵升级财务与总经办；由处置组合推导后落库
+  needFinanceApproval Boolean @default(false) @map("need_finance_approval")
+  /// 判定不成立的理由；REJECTED 时必填
+  rejectReason        String? @map("reject_reason") @db.VarChar(500)
+
+  lines SalesReturnLine[]
+
+  createdBy   String?  @map("created_by") @db.VarChar(32)
+  updatedBy   String?  @map("updated_by") @db.VarChar(32)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  versionLock Int      @default(0) @map("version_lock")
+
+  @@index([customerId, status])
+  @@index([orderId])
+  @@index([shipmentId])
+  @@index([customerId, closedAt])
+  @@map("sales_returns")
+}
+
+/// 退货明细行——责任归属与处置方式的**唯一真相所在**。
+model SalesReturnLine {
+  id       String @id @default(uuid()) @db.Uuid
+  returnId String @map("return_id") @db.Uuid
+  sequence Int
+
+  /// 关联原出货行与原订单行，用于数量校验与批次追溯
+  shipmentLineId String? @map("shipment_line_id") @db.Uuid
+  orderLineId    String? @map("order_line_id") @db.Uuid
+
+  productName String @map("product_name") @db.VarChar(128)
+  drawingNo   String @map("drawing_no") @db.VarChar(128)
+  batchNo     String @map("batch_no") @db.VarChar(64)
+
+  returnQty      Decimal @map("return_qty") @db.Decimal(18, 6)
+  unitPriceMinor BigInt  @map("unit_price_minor")
+  /// 该行涉及货值 = 退货数 × 单价
+  amountMinor    BigInt  @map("amount_minor")
+
+  /// 该行的具体不良现象；分析报表按 reason 归集
+  reason String @db.VarChar(500)
+
+  responsibility ReturnResponsibility @default(UNDECIDED)
+  disposition    ReturnDisposition    @default(UNDECIDED)
+  /// 退款 / 让步 / 报废动钱，理由必填
+  dispositionNote String? @map("disposition_note") @db.VarChar(500)
+
+  /// 让步接收时与客户谈定的减价金额。**只有 CONCESSION 用**，
+  /// 且必须录入——让步减多少是谈出来的，系统推算不出来。
+  allowanceMinor BigInt? @map("allowance_minor")
+
+  /// 物理退货入库（不良仓）。返工必须先收到不良品才能开工。
+  receivedAt  DateTime? @map("received_at")
+  receivedQty Decimal?  @map("received_qty") @db.Decimal(18, 6)
+
+  /// 该行的扣减是否已由红字发票承接。开票制口径下用它避免重复冲减；
+  /// 发货制口径下红字只影响开票列，不影响期末余额，因此不看这个标志。
+  settledByCreditNote Boolean @default(false) @map("settled_by_credit_note")
+  creditNoteDocNo     String? @map("credit_note_doc_no") @db.VarChar(32)
+
+  salesReturn SalesReturn @relation(fields: [returnId], references: [id], onDelete: Cascade)
+
+  @@unique([returnId, sequence])
+  @@index([shipmentLineId])
+  @@index([orderLineId])
+  @@index([batchNo])
+  @@map("sales_return_lines")
 }

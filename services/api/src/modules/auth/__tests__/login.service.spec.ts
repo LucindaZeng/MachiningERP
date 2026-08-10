@@ -29,7 +29,7 @@ const ACTIVE_USER: UserRecord = {
   employmentStatus: 'ACTIVE',
   leftAt: null,
   roleCodes: ['SALES_MANAGER'],
-  permissionCodes: ['sales.hk-price.view', 'sales.operate'],
+  permissionCodes: ['quote.approve', 'sales.operate'],
 }
 
 class FakeAttempts implements LoginAttemptRepositoryPort {
@@ -114,7 +114,7 @@ describe('登录成功路径', () => {
       account: 'luoxiaolin',
       department: '业务部',
       roles: ['SALES_MANAGER'],
-      permissions: ['sales.hk-price.view', 'sales.operate'],
+      permissions: ['quote.approve', 'sales.operate'],
     })
     // 账号做了 trim + 小写归一化后再查库
     expect(harness.findForLogin).toHaveBeenCalledWith('INTERNAL', 'luoxiaolin')

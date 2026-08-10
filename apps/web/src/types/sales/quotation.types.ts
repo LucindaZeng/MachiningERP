@@ -16,6 +16,8 @@ export interface Quotation {
   productName: string
   drawingNo: string
   drawingVersion: string
+  /** 图纸库版本主键，在线预览按它定位文件；旧数据可能没有 */
+  drawingVersionId?: string
   material: string
   surfaceTreatment: string
   tiers: QuotationTier[]

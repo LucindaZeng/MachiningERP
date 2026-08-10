@@ -94,21 +94,6 @@ describe('建客户档案', () => {
     expect(view.status).toBe('DRAFT')
   })
 
-  it('勾选香港价格时记录申请人，供审计追责', async () => {
-    const { service } = build([])
-    const view = await service.create(
-      {
-        ...VALID_INPUT,
-        hkPricingEnabled: true,
-        hkFactorBps: 7000,
-        hkEffectiveFrom: '2026-01-01',
-        hkChangeReason: '代生产协议',
-      },
-      { ...OWNER, permissions: [...OWNER.permissions, PERMISSION_CODES.HK_PRICE_VIEW] },
-    )
-
-    expect(view.hk?.appliedBy).toBe('WFX-2018-0042')
-  })
 })
 
 describe('数据权限在查询层强制注入', () => {

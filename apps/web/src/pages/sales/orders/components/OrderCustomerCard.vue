@@ -2,20 +2,13 @@
 import { PAYMENT_TERM_LABELS } from '@machining-erp/shared'
 
 import { CHARGE_MODE } from '@/components/status-dictionary'
-import { usePermission } from '@/composables/use-permission'
 
 import type { ChargeMode, Customer, OrderType } from '@/types/sales.types'
-
-/**
- * 香港 70% 是独立权限点，属于横切关注点而非父页数据，
- * 因此与 HkPriceBreakdown 保持一致，由组件自己读权限，避免逐层透传布尔值。
- */
-const { canViewHkPrice } = usePermission()
 
 defineProps<{
   orderType: OrderType
   customers: Customer[]
-  /** 未选客户时为 undefined，付款条件与 HK 标记都不展示 */
+  /** 未选客户时为 undefined，付款条件不展示 */
   selectedCustomer?: Customer
   isFormal: boolean
   isStock: boolean
@@ -57,14 +50,6 @@ const CHARGE_OPTIONS = [
       <p v-if="selectedCustomer" class="field-hint">
         付款条件 {{ PAYMENT_TERM_LABELS[selectedCustomer.paymentTerm] }} · 结算币种
         {{ selectedCustomer.currency }}
-        <el-tag
-          v-if="selectedCustomer.hk?.pricingEnabled && canViewHkPrice"
-          size="small"
-          type="warning"
-          effect="dark"
-        >
-          香港代生产价格客户 ×0.7
-        </el-tag>
       </p>
     </el-form-item>
 

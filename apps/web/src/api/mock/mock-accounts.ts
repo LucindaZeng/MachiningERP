@@ -16,13 +16,12 @@ export interface MockAccount {
 
 /**
  * 角色 → 权限点，与后端 `services/api/prisma/seeds/roles.seed.ts` 保持同一份口径。
- * 关键差异：香港 70% 价格只有被单独授予的业务人员可见；成本核算只有报价工程师能做。
+ * 关键差异：成本核算只有报价工程师能做；客户敏感字段只有业务主管能改。
  */
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   SYS_ADMIN: [PERMISSION_CODES.IT_ACCOUNT_ADMIN],
   EXECUTIVE: [PERMISSION_CODES.STOCK_ORDER_GM_APPROVE, PERMISSION_CODES.ORDER_TRACKING_VIEW],
   SALES_MANAGER: [
-    PERMISSION_CODES.HK_PRICE_VIEW,
     PERMISSION_CODES.SALES_OPERATE,
     PERMISSION_CODES.INVOICE_APPLY,
     PERMISSION_CODES.QUOTE_APPROVE,

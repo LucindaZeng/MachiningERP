@@ -2,10 +2,10 @@
 import { computed } from 'vue'
 
 import DocTimeline from '@/components/DocTimeline.vue'
+import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
 import { CHARGE_MODE, ORDER_TYPE } from '@/components/status-dictionary'
 import StatusTag from '@/components/StatusTag.vue'
-
-import HkPriceBreakdown from './HkPriceBreakdown.vue'
+import { useFilePreview } from '@/composables/use-file-preview'
 
 import type { SalesOrder } from '@/types/sales.types'
 
@@ -21,6 +21,13 @@ const visible = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit('update:modelValue', value),
 })
+
+const filePreview = useFilePreview()
+
+/** 客户订单原件挂在订单上，预览按订单主键定位 */
+function previewCustomerPo(orderId: string): void {
+  void filePreview.open('order-customer-po', orderId)
+}
 </script>
 
 <template>
@@ -30,6 +37,15 @@ const visible = computed({
         <el-descriptions-item label="客户">{{ order.customerName }}</el-descriptions-item>
         <el-descriptions-item label="客户原始订单">
           {{ order.customerPoNo ?? '—' }}
+          <el-button
+            v-if="order.customerPoFile"
+            link
+            type="primary"
+            class="preview-link"
+            @click="previewCustomerPo(order.id)"
+          >
+            预览原件
+          </el-button>
         </el-descriptions-item>
         <el-descriptions-item label="订单类型">
           <StatusTag :dict="ORDER_TYPE" :value="order.orderType" />
@@ -47,6 +63,12 @@ const visible = computed({
         </el-descriptions-item>
         <el-descriptions-item label="数量">{{ order.quantity }}</el-descriptions-item>
         <el-descriptions-item label="客户交期">{{ order.deliveryDate }}</el-descriptions-item>
+        <el-descriptions-item label="单价">
+          {{ order.unitPrice }} {{ order.currency }}
+        </el-descriptions-item>
+        <el-descriptions-item label="金额">
+          {{ order.amount }} {{ order.currency }}
+        </el-descriptions-item>
         <el-descriptions-item label="关联报价">
           {{ order.quotationNo ?? '—' }}
         </el-descriptions-item>
@@ -98,9 +120,6 @@ const visible = computed({
         description="备料订单不向客户交货，完工全部入库即视为订单完成；库存余量可被后续正式订单领用。"
       />
 
-      <h3 class="drawer-title">价格计算</h3>
-      <HkPriceBreakdown :hk="order.hk" :currency="order.currency" :quantity="order.quantity" />
-
       <el-alert
         v-if="order.reviewRounds > 1"
         class="drawer-alert"
@@ -121,9 +140,23 @@ const visible = computed({
       </template>
     </template>
   </el-drawer>
+
+    <FilePreviewDialog
+      v-model="filePreview.visible.value"
+      :loading="filePreview.loading.value"
+      :preview="filePreview.preview.value"
+      :unsupported="filePreview.unsupported.value"
+      :error-message="filePreview.errorMessage.value"
+      @close="filePreview.close"
+      @download="filePreview.download"
+    />
 </template>
 
 <style scoped>
+.preview-link {
+  margin-left: 8px;
+}
+
 .item-code-inline {
   font-size: 12.5px;
   font-weight: 600;

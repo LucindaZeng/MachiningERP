@@ -24,17 +24,6 @@ export interface ShipmentLine {
   amount: string
 }
 
-/** 退货明细行：一张退货单可以退多项产品 */
-export interface ReturnLine {
-  seq: number
-  productName: string
-  drawingNo: string
-  batchNo: string
-  returnQty: string
-  reason: string
-  amount: string
-}
-
 export interface Shipment {
   id: string
   docNo: string

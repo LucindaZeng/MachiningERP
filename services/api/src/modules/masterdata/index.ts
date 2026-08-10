@@ -2,7 +2,11 @@
 
 export { MasterdataModule } from './masterdata.module'
 
-export { CustomerService } from './services/customer.service'
+export {
+  CustomerService,
+  type CustomerProfile,
+  type CustomerInvoiceProfile,
+} from './services/customer.service'
 export type { CreateCustomerInput } from './services/customer-create-input'
 export { toCreateCustomerData } from './services/customer-create.mapper'
 export { CustomerUpdateService, type UpdateCustomerResult } from './services/customer-update.service'

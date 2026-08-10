@@ -22,17 +22,6 @@ export interface CustomerDeliveryAddressContract {
   isDefault: boolean
 }
 
-/** 香港 70% 价格分组。**无权限时整组缺席**，不是给假值。 */
-export interface CustomerHkPricingContract {
-  pricingEnabled: boolean
-  /** 0.7 表示 70% */
-  factor: number
-  effectiveFrom: string | null
-  appliedBy: string | null
-  approvedBy: string | null
-  changeReason: string | null
-}
-
 export interface CustomerFinanceContract {
   /** 无 `customer.finance.view` 权限时只给后 4 位 */
   taxNo: string | null
@@ -74,7 +63,6 @@ export interface CustomerContract {
   approvedBy: string | null
   addresses: CustomerDeliveryAddressContract[]
   finance: CustomerFinanceContract
-  hk?: CustomerHkPricingContract
   createdBy: string | null
   updatedAt: string
   version: number

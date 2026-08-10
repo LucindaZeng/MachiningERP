@@ -8,8 +8,8 @@ import type { Customer, CustomerCompleteness } from '@/types/sales.types'
  * 后端按统一分页包裹返回 `{ data, meta }`，`request()` 已经解包 `data`，
  * 所以这里直接拿到当前页的客户数组；分页 meta 暂时用不到（列表页仍是前端筛选）。
  *
- * 返回体已经由后端按权限裁剪：无 `sales.hk-price.view` 时 `hk` 整组缺席，
- * 无 `customer.finance.view` 时税号与银行账号只给后 4 位。前端不再自行推导。
+ * 返回体已经由后端按权限裁剪：无 `customer.finance.view` 时税号与银行账号
+ * 只给后 4 位。前端不再自行推导。
  */
 export function fetchCustomers(): Promise<Customer[]> {
   return request<Customer[]>({ method: 'GET', url: '/customers' })

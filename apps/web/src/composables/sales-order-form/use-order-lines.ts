@@ -32,7 +32,7 @@ export function useOrderLines(form: SalesOrderFormModel) {
   return { totalQty, totalAmount, addLine, removeLine }
 }
 
-/** 第一项产品同步到订单主字段：HK 试算、备料领用与校验沿用主字段口径 */
+/** 第一项产品同步到订单主字段：备料领用与校验沿用主字段口径 */
 function watchFirstLineSync(form: SalesOrderFormModel, totalQty: ComputedRef<number>): void {
   watch(
     () => form.lines.map(lineFingerprint).join(),

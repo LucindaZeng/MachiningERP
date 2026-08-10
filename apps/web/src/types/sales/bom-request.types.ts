@@ -20,6 +20,8 @@ export interface BomRequest {
   productName: string
   drawingNo: string
   drawingVersion: string
+  /** 图纸库版本主键，在线预览按它定位文件；图纸沿用报价环节上传的那一版 */
+  drawingVersionId?: string
   material: string
   surfaceTreatment: string
   inspection: string

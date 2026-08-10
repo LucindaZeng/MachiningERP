@@ -3,12 +3,6 @@
  * 登录成功后由后端下发 permissions 数组，前端不再自行推导。
  */
 export const PERMISSION_CODES = {
-  /**
-   * 香港 70% 价格：**独立权限点**。
-   * 未授予者在列表、详情、报表与导出中一律看不到勾选、原始价格与计算价格
-   * （docs/product/business-department-modules.md 3.2）。
-   */
-  HK_PRICE_VIEW: 'sales.hk-price.view',
   /** 成本核算（建立/修改成本分析）——仅报价工程师 */
   COSTING_EDIT: 'quote.costing.edit',
   /** 报价单修改申请的处理（改成本分析 / 驳回）——仅报价工程师 */
@@ -19,15 +13,28 @@ export const PERMISSION_CODES = {
   SALES_OPERATE: 'sales.operate',
   /** 发票申请提交 */
   INVOICE_APPLY: 'sales.invoice.apply',
-  /** 订单审核——业务经理 */
+  /** 订单审核——业务经理，审核链第一节 */
   ORDER_APPROVE: 'order.approve',
+  /** 订单财务审核（资金占用、付款条件）——审核链第二节 */
+  ORDER_FINANCE_REVIEW: 'order.finance.review',
+  /** 跨部门订单评审——审核链最后一节 */
+  ORDER_CROSS_REVIEW: 'order.cross-review',
   /** 备料订单总经办审批 */
   STOCK_ORDER_GM_APPROVE: 'order.stock-prep.gm-approve',
   /** 订单追踪查看（业务部 / 总经办 / PMC 三方） */
   ORDER_TRACKING_VIEW: 'order.tracking.view',
+  /** 工程部：接收 BOM 申请、退回补料、回传 BOM 与程序结果 */
+  ENGINEERING_BOM_HANDLE: 'eng.bom.handle',
+  /**
+   * 品质部：客诉责任归属判定与 8D。
+   *
+   * 与业务权限分开的理由写在控制矩阵里：客诉由业务登记、由**品质**判定
+   * ——让登记人自己认定责任，等于让被投诉方给自己打分。
+   */
+  QUALITY_RMA_JUDGE: 'quality.rma.judge',
   /** 客户档案建档与常规字段维护 */
   CUSTOMER_EDIT: 'customer.edit',
-  /** 客户档案敏感字段（银行账号、付款条件、香港勾选）变更的审批权 */
+  /** 客户档案敏感字段（银行账号、付款条件等）变更的审批权 */
   CUSTOMER_SENSITIVE_EDIT: 'customer.sensitive.edit',
   /** 跨业务员查看全部客户；未授予者只能看到自己负责的客户 */
   CUSTOMER_VIEW_ALL: 'customer.view-all',
