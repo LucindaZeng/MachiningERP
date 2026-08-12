@@ -4,8 +4,10 @@ import { AuditModule } from '../audit'
 import { ObjectStorageModule } from '../object-storage'
 
 import { FilePreviewController } from './controllers/file-preview.controller'
+import { CustomsDocumentPreviewSource } from './repositories/customs-document.source'
 import { DrawingVersionPreviewSource } from './repositories/drawing-version.source'
 import { FILE_PREVIEW_SOURCES } from './repositories/file-preview-source.port'
+import { GeneratedDocumentPreviewSource } from './repositories/generated-document.source'
 import { OrderCustomerPoPreviewSource } from './repositories/order-customer-po.source'
 import {
   FILE_PREVIEW_CONFIG,
@@ -27,13 +29,22 @@ import { FilePreviewService } from './services/file-preview.service'
     FilePreviewService,
     DrawingVersionPreviewSource,
     OrderCustomerPoPreviewSource,
+    CustomsDocumentPreviewSource,
+    GeneratedDocumentPreviewSource,
     {
       provide: FILE_PREVIEW_SOURCES,
-      inject: [DrawingVersionPreviewSource, OrderCustomerPoPreviewSource],
+      inject: [
+        DrawingVersionPreviewSource,
+        OrderCustomerPoPreviewSource,
+        CustomsDocumentPreviewSource,
+        GeneratedDocumentPreviewSource,
+      ],
       useFactory: (
         drawings: DrawingVersionPreviewSource,
         orders: OrderCustomerPoPreviewSource,
-      ) => [drawings, orders],
+        customs: CustomsDocumentPreviewSource,
+        generated: GeneratedDocumentPreviewSource,
+      ) => [drawings, orders, customs, generated],
     },
   ],
   exports: [FilePreviewService],

@@ -34,7 +34,7 @@ export const DOC_NUMBER_RULES: RuleSeed[] = [
   { docType: 'SHP', prefix: 'SHP', datePattern: 'yyyyMMdd', padding: 4, separator: '', resetPolicy: 'DAILY', description: '出货单' },
   { docType: 'RMA', prefix: 'RMA', datePattern: 'yyyyMMdd', padding: 4, separator: '', resetPolicy: 'DAILY', description: '退货单' },
   { docType: 'INV', prefix: 'INV', datePattern: 'yyyyMMdd', padding: 4, separator: '', resetPolicy: 'DAILY', description: '发票申请' },
-  { docType: 'CUD', prefix: 'CUD', datePattern: 'yyyyMMdd', padding: 4, separator: '', resetPolicy: 'DAILY', description: '报关资料' },
+  { docType: 'EXP', prefix: 'EXP', datePattern: 'yyyyMMdd', padding: 4, separator: '', resetPolicy: 'DAILY', description: '报关资料' },
   { docType: 'STM', prefix: 'STM', datePattern: 'yyyyMM', padding: 4, separator: '', resetPolicy: 'MONTHLY', description: '客户对账单' },
 ]
 

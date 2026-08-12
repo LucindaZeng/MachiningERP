@@ -1,23 +1,10 @@
+/**
+ * 类型已迁到 `@machining-erp/shared`（development-guide §1：packages/shared 承载前后端共享契约）。
+ * 本文件只保留 **mock 数据**——真实接口未接通时的回落数据源，形状由 shared 保证与后端一致。
+ */
 import type { AlertItem, TodoItem } from '@/types/sales.types'
+import type { ApprovalEfficiency, KpiCard } from '@machining-erp/shared'
 
-export interface KpiCard {
-  key: string
-  label: string
-  value: string
-  unit: string
-  trend: string
-  trendUp: boolean
-  hint: string
-}
-
-export interface ApprovalEfficiency {
-  node: string
-  median: string
-  p90: string
-  onTimeRate: number
-  returnRate: number
-  backlog: number
-}
 
 export const KPI_CARDS: KpiCard[] = [
   {

@@ -2,7 +2,7 @@
 import { levelTag, pct } from './report-format'
 import ReportCard from './ReportCard.vue'
 
-import type { OrderExtraReports } from '@/api/mock/sales/analytics-order.fixture'
+import type { OrderExtraReports } from '@machining-erp/shared'
 
 const props = defineProps<{ reports: OrderExtraReports }>()
 

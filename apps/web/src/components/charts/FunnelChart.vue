@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { FunnelStage } from '@/api/mock/sales/analytics.fixture'
+import type { FunnelStage } from '@machining-erp/shared'
 
 const props = defineProps<{ stages: FunnelStage[] }>()
 

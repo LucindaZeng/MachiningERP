@@ -1,81 +1,16 @@
 /**
+ * 类型已迁到 `@machining-erp/shared`（development-guide §1：packages/shared 承载前后端共享契约）。
+ * 本文件只保留 **mock 数据**——真实接口未接通时的回落数据源，形状由 shared 保证与后端一致。
+ */
+import type {
+  MarketReports,
+} from '@machining-erp/shared'
+
+
+/**
  * 客户流失预警（含跟进结果）、产品与材质工艺分析、出货达成明细（部分出货 / 尾数 / 阻断原因）、
  * 退货质量分析（责任归属与损失金额）。
  */
-
-export interface ChurnRow {
-  customer: string
-  grade: 'A' | 'B' | 'C'
-  lastOrderAt: string
-  daysSince: number
-  avgIntervalDays: number
-  amountChange: number
-  level: 'watch' | 'risk' | 'churn'
-  owner: string
-  followedAt: string
-  followResult: string
-  nextAction: string
-}
-
-export interface ProductProcessRow {
-  productName: string
-  drawingNo: string
-  material: string
-  processRoute: string
-  orders: number
-  amount: number
-  marginRate: number
-  machineHours: number
-  difficulty: '常规' | '较难' | '难加工'
-  note: string
-}
-
-export interface MaterialProcessCell {
-  material: string
-  turning: number
-  milling: number
-  fourAxis: number
-  outsource: number
-}
-
-export interface PartialShipRow {
-  orderNo: string
-  customer: string
-  productName: string
-  orderQty: number
-  shippedQty: number
-  remainQty: number
-  tailPath: string
-  dueDate: string
-  note: string
-}
-
-export interface ShipBlockerRow {
-  reason: string
-  count: number
-  qtyAffected: number
-  share: number
-  avgDelayDays: number
-  owner: string
-}
-
-export interface RmaResponsibilityRow {
-  responsibility: string
-  batches: number
-  quantity: number
-  lossAmount: number
-  share: number
-  handled: string
-}
-
-export interface MarketReports {
-  churn: ChurnRow[]
-  productProcess: ProductProcessRow[]
-  materialProcess: MaterialProcessCell[]
-  partialShip: PartialShipRow[]
-  shipBlockers: ShipBlockerRow[]
-  rmaResponsibility: RmaResponsibilityRow[]
-}
 
 export const MARKET_REPORTS: MarketReports = {
   churn: [

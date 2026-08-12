@@ -1,132 +1,16 @@
 /**
+ * 类型已迁到 `@machining-erp/shared`（development-guide §1：packages/shared 承载前后端共享契约）。
+ * 本文件只保留 **mock 数据**——真实接口未接通时的回落数据源，形状由 shared 保证与后端一致。
+ */
+import type {
+  OrderExtraReports,
+} from '@machining-erp/shared'
+
+
+/**
  * 订单结构（五类）、在手订单 Backlog、样品转化率、备料分析。
  * 备料订单不向客户交货，全部入库即视为完成；正式订单可关联消耗，成本按加权平均口径计入。
  */
-
-export interface OrderType5Row {
-  type: string
-  count: number
-  quantity: number
-  amount: number
-  share: number
-  marginRate: number | null
-  note: string
-}
-
-export interface BacklogMonthRow {
-  month: string
-  orders: number
-  quantity: number
-  amount: number
-  capacityLoad: number
-  risk: 'ok' | 'tight' | 'over'
-}
-
-export interface BacklogDimRow {
-  name: string
-  orders: number
-  amount: number
-  share: number
-  nearestDue: string
-}
-
-export interface BacklogAlertRow {
-  orderNo: string
-  customer: string
-  productName: string
-  dueDate: string
-  daysLeft: number
-  stage: string
-  level: 'due' | 'late'
-  owner: string
-  action: string
-}
-
-export interface SampleCycleRow {
-  month: string
-  samples: number
-  converted: number
-  rate: number
-  avgDays: number
-}
-
-export interface SampleChargeRow {
-  mode: '免费样品' | '收费样品'
-  samples: number
-  converted: number
-  rate: number
-  avgAmount: number
-  note: string
-}
-
-export interface SamplePendingRow {
-  docNo: string
-  customer: string
-  productName: string
-  sampleAt: string
-  daysSince: number
-  charged: boolean
-  lastFollow: string
-  suggestion: string
-}
-
-export interface StockProgressRow {
-  docNo: string
-  productName: string
-  drawingNo: string
-  planQty: number
-  finishedQty: number
-  stockedQty: number
-  rate: number
-  eta: string
-  status: '生产中' | '已入库' | '已耗尽'
-}
-
-export interface StockAgingRow {
-  bucket: string
-  batches: number
-  quantity: number
-  amount: number
-  share: number
-}
-
-export interface StockConsumeRow {
-  date: string
-  stockNo: string
-  orderNo: string
-  usedQty: number
-  stockUnitCost: number
-  produceQty: number
-  produceUnitCost: number
-  blendedUnitCost: number
-  remaining: number
-}
-
-export interface StockIdleRow {
-  stockNo: string
-  productName: string
-  remainingQty: number
-  ageDays: number
-  amount: number
-  level: 'watch' | 'idle'
-  suggestion: string
-}
-
-export interface OrderExtraReports {
-  orderType5: OrderType5Row[]
-  backlogMonth: BacklogMonthRow[]
-  backlogCustomer: BacklogDimRow[]
-  backlogProduct: BacklogDimRow[]
-  backlogAlerts: BacklogAlertRow[]
-  sampleCycle: SampleCycleRow[]
-  sampleCharge: SampleChargeRow[]
-  samplePending: SamplePendingRow[]
-  stockProgress: StockProgressRow[]
-  stockAging: StockAgingRow[]
-  stockConsume: StockConsumeRow[]
-  stockIdle: StockIdleRow[]
-  stockCapital: { totalAmount: number; idleAmount: number; turnoverDays: number; note: string }
-}
 
 export const ORDER_EXTRA_REPORTS: OrderExtraReports = {
   orderType5: [

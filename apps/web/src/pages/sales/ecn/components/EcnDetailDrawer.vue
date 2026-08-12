@@ -6,8 +6,30 @@ import { ECN_CHANGE_TYPE } from '@/components/status-dictionary'
 
 import type { EngineeringChange } from '@/types/sales.types'
 
-const props = defineProps<{ modelValue: boolean; change: EngineeringChange | null }>()
-const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
+const props = defineProps<{
+  modelValue: boolean
+  change: EngineeringChange | null
+  busy: boolean
+}>()
+
+const emit = defineEmits<{
+  'update:modelValue': [boolean]
+  'start-assessment': []
+  'return-for-detail': []
+  assess: []
+  'submit-signoff': []
+  signoff: []
+  approve: []
+  reject: []
+  execute: []
+  close: []
+}>()
+
+/**
+ * 底部按钮按状态给。**服务端状态机才是权威**——这里只是提前把做不了的藏起来，
+ * 点下去后端还会再判一次（改图未同步工艺路线、四项影响没评全等）。
+ */
+const status = computed(() => props.change?.status ?? 'draft')
 
 const visible = computed({
   get: () => props.modelValue,
@@ -84,8 +106,27 @@ const visible = computed({
     <!-- Element Plus 具名插槽必须是 el-drawer 的直接子节点，不能再套一层 v-if 的 template -->
     <template #footer>
       <template v-if="change">
-        <el-button>导出变更通知单</el-button>
-        <el-button type="primary" :disabled="change.status === 'draft'">催办工程评估</el-button>
+        <template v-if="status === 'submitted'">
+          <el-button :loading="busy" @click="emit('start-assessment')">开始工程评估</el-button>
+        </template>
+        <template v-if="status === 'assessing'">
+          <el-button :loading="busy" @click="emit('return-for-detail')">退回补充说明</el-button>
+          <el-button :loading="busy" @click="emit('assess')">填写影响评估</el-button>
+          <el-button type="primary" :loading="busy" @click="emit('submit-signoff')">
+            送跨部门会签
+          </el-button>
+        </template>
+        <template v-if="status === 'reviewing'">
+          <el-button :loading="busy" @click="emit('signoff')">记录会签</el-button>
+          <el-button type="danger" plain :loading="busy" @click="emit('reject')">驳回</el-button>
+          <el-button type="primary" :loading="busy" @click="emit('approve')">批准发布</el-button>
+        </template>
+        <el-button v-if="status === 'approved'" type="primary" :loading="busy" @click="emit('execute')">
+          转入执行
+        </el-button>
+        <el-button v-if="status === 'executing'" type="primary" :loading="busy" @click="emit('close')">
+          结案
+        </el-button>
       </template>
     </template>
   </el-drawer>

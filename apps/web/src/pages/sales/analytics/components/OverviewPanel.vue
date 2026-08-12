@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { Download } from '@element-plus/icons-vue'
 
+
+
 import FunnelChart from '@/components/charts/FunnelChart.vue'
 import RankBarChart from '@/components/charts/RankBarChart.vue'
 import ShareStackedBar from '@/components/charts/ShareStackedBar.vue'
@@ -9,7 +11,9 @@ import { exportNotes, exportSheet } from '@/utils/export-excel'
 
 import { FIELD_LABELS } from './report-fields'
 
-import type { SalesAnalytics } from '@/api/mock/sales/analytics.fixture'
+import type { SalesAnalytics } from '@machining-erp/shared'
+
+
 
 defineProps<{ data: SalesAnalytics; showTable: boolean }>()
 

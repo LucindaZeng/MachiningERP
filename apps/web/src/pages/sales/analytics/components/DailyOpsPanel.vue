@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 
 import ReportCard from './ReportCard.vue'
 
-import type { DailyOpsReport, DailyOpsRow } from '@/api/mock/sales/daily-ops.fixture'
+import type { DailyOpsReport, DailyOpsRow } from '@machining-erp/shared'
 
 const props = defineProps<{ report: DailyOpsReport }>()
 

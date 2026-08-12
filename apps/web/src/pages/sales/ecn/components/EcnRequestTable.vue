@@ -104,6 +104,9 @@ const { filtered, loading, keyword, filters, resetFilters, reload } = useResourc
 function openDetail(row: EngineeringChange): void {
   emit('detail', row)
 }
+
+/** 页面在流转动作之后要刷新列表——把 reload 暴露出去，避免再造一套事件。 */
+defineExpose({ reload })
 </script>
 
 <template>

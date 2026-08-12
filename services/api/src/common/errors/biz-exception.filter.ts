@@ -11,6 +11,7 @@ import {
 import { traceIdOf } from '../http/trace-context'
 
 import { BizError } from './biz-error'
+import { captureErrorSource } from './error-source'
 
 import type { Request, Response } from 'express'
 
@@ -20,6 +21,17 @@ interface NormalizedError {
   message: string
   captchaRequired?: boolean
   details?: unknown
+  /** 抛出点；BizError 构造时自动捕获，其它异常靠栈首帧兜底 */
+  source?: string | null
+  stack?: string | undefined
+}
+
+/**
+ * 抛出点与堆栈**只在非生产环境**随响应下发（development-guide 第 4 节）。
+ * 生产环境它们仍然进日志——排障要得到，攻击者要不到。
+ */
+function exposesDiagnostics(): boolean {
+  return process.env.NODE_ENV !== 'production'
 }
 
 /** 统一错误出口：所有异常都转成 api-conventions.md 约定的 `{ error: { code, message, traceId } }`。 */
@@ -36,6 +48,14 @@ export class BizExceptionFilter implements ExceptionFilter {
     const normalized = this.normalize(exception)
     this.log(exception, normalized, traceId)
 
+    const diagnostics =
+      exposesDiagnostics()
+        ? {
+            ...(normalized.source ? { source: normalized.source } : {}),
+            ...(normalized.stack ? { stack: normalized.stack } : {}),
+          }
+        : {}
+
     const body: ApiErrorBody = {
       error: {
         code: normalized.code,
@@ -45,6 +65,7 @@ export class BizExceptionFilter implements ExceptionFilter {
           ? {}
           : { captchaRequired: normalized.captchaRequired }),
         ...(normalized.details === undefined ? {} : { details: normalized.details }),
+        ...diagnostics,
       },
     }
 
@@ -59,6 +80,8 @@ export class BizExceptionFilter implements ExceptionFilter {
         message: exception.message,
         captchaRequired: exception.captchaRequired,
         details: exception.details,
+        source: exception.source,
+        stack: exception.stack,
       }
     }
 
@@ -66,7 +89,12 @@ export class BizExceptionFilter implements ExceptionFilter {
       return this.fromHttpException(exception)
     }
 
-    return { ...SYSTEM_ERRORS.UNKNOWN }
+    // 非 BizError 的意外异常同样要能定位：栈首帧就是抛出点
+    return {
+      ...SYSTEM_ERRORS.UNKNOWN,
+      source: exception instanceof Error ? captureErrorSource(exception.stack) : null,
+      stack: exception instanceof Error ? exception.stack : undefined,
+    }
   }
 
   private fromHttpException(exception: HttpException): NormalizedError {
@@ -82,11 +110,18 @@ export class BizExceptionFilter implements ExceptionFilter {
       status,
       message: Array.isArray(message) ? message.join('；') : message,
       details: typeof payload === 'object' ? payload : undefined,
+      source: captureErrorSource(exception.stack),
+      stack: exception.stack,
     }
   }
 
+  /**
+   * 抛出点进**每一条**日志，而不只是 5xx 的那几条。
+   * 4xx 才是排障时最难定位的一类——它不带堆栈，光有错误码根本分不清是哪处校验拦的。
+   */
   private log(exception: unknown, normalized: NormalizedError, traceId: string): void {
-    const line = `[${traceId}] ${normalized.code} ${normalized.message}`
+    const at = normalized.source ? ` @ ${normalized.source}` : ''
+    const line = `[${traceId}] ${normalized.code} ${normalized.message}${at}`
     if (normalized.status >= 500) {
       this.logger.error(line, exception instanceof Error ? exception.stack : String(exception))
       return

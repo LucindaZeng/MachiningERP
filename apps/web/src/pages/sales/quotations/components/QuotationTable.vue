@@ -3,8 +3,11 @@ import { Download, WarnTriangleFilled } from '@element-plus/icons-vue'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import {
+  issueQuotationDocument,
+  mergeExportQuotations,
+} from '@/api/sales/docgen.api'
 import { fetchQuotations } from '@/api/sales/quotation.api'
-import DocTimeline from '@/components/DocTimeline.vue'
 import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
 import {
   matchDateRange,
@@ -15,9 +18,11 @@ import {
 import FilterBar from '@/components/FilterBar.vue'
 import { DOC_STATUS } from '@/components/status-dictionary'
 import StatusTag from '@/components/StatusTag.vue'
+import { useDocumentExport } from '@/composables/use-document-export'
 import { useFilePreview } from '@/composables/use-file-preview'
 import { useResourceList } from '@/composables/use-resource-list'
 
+import QuotationDetailDrawer from './QuotationDetailDrawer.vue'
 import { exportQuotations } from './quote-export'
 
 import type { Quotation } from '@/types/sales.types'
@@ -37,14 +42,29 @@ function onSelectionChange(rows: Quotation[]): void {
   selected.value = rows
 }
 
-/** 多选合并导出：把选中的多份报价合并到同一张报价表 */
-function exportSelected(): void {
+const documentExport = useDocumentExport()
+
+/**
+ * 多选合并出具比较表。**走服务端受控模板**，不再用客户端 SheetJS——
+ * 合并比较表是要发出去给人看的受控文档（留生成记录、可预览、可审计），
+ * 与「把当前表格另存为 Excel」是两件事。后者仍在下面的 `exportAll`。
+ */
+async function mergeSelected(): Promise<void> {
   if (!selected.value.length) {
     return
   }
-  exportQuotations(selected.value, selected.value.length > 1)
+  await documentExport.issue(
+    () => mergeExportQuotations(selected.value.map((row) => row.id)),
+    '报价合并比较表',
+  )
 }
 
+/** 按公司受控模板出具正式报价单（国内 / 国外版式由单据自身决定）。 */
+async function issueDocument(row: Quotation): Promise<void> {
+  await documentExport.issue(() => issueQuotationDocument(row.id), '报价单')
+}
+
+/** 通用列表导出：导出**屏幕上这张表**，客户端生成，不留生成记录。 */
 function exportAll(): void {
   exportQuotations(filtered.value, true)
 }
@@ -117,7 +137,6 @@ const detailVisible = ref(false)
 const current = ref<Quotation | null>(null)
 
 /** 强制关联成本分析：未关联的报价单不允许提交审批 */
-const costMissing = computed(() => Boolean(current.value) && !current.value?.costAnalysisNo)
 const missingCount = computed(() => filtered.value.filter((row) => !row.costAnalysisNo).length)
 
 function openDetail(row: Quotation): void {
@@ -164,10 +183,17 @@ function previewDrawing(versionId: string): void {
         @search="reload"
       >
         <template #extra>
-          <el-button size="small" :disabled="!selected.length" @click="exportSelected">
-            合并导出所选（{{ selected.length }}）
+          <el-button
+            size="small"
+            type="primary"
+            plain
+            :disabled="!selected.length"
+            :loading="documentExport.issuing.value"
+            @click="mergeSelected"
+          >
+            出具合并比较表（{{ selected.length }}）
           </el-button>
-          <el-button size="small" :icon="Download" @click="exportAll">导出 Excel</el-button>
+          <el-button size="small" :icon="Download" @click="exportAll">导出列表 Excel</el-button>
     <FilePreviewDialog
       v-model="filePreview.visible.value"
       :loading="filePreview.loading.value"
@@ -241,132 +267,33 @@ function previewDrawing(versionId: string): void {
           <template #default="{ row }"><StatusTag :dict="DOC_STATUS" :value="row.status" /></template>
         </el-table-column>
         <el-table-column prop="owner" label="业务员" width="85" />
-        <el-table-column label="操作" width="140">
+        <el-table-column label="操作" width="200">
           <template #default="{ row }">
             <el-button link type="primary" @click.stop="openDetail(row)">详情</el-button>
             <el-button link type="primary" @click.stop="goCostAnalysis">核价</el-button>
+            <el-button
+              link
+              type="primary"
+              :loading="documentExport.issuing.value"
+              @click.stop="issueDocument(row)"
+            >
+              出具报价单
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <el-drawer v-model="detailVisible" size="640px" :title="current?.docNo">
-      <template v-if="current">
-        <el-alert
-          v-if="current.stage === 'applied'"
-          class="drawer-alert"
-          type="warning"
-          :closable="false"
-          show-icon
-          title="业务已提交报价申请，等待报价工程师补齐资料"
-          description="本单目前只有业务提供的图纸与数量；材料牌号、表面处理、工艺路线、成本分析与单价由报价工程师填写后才能报出。"
-        />
-
-        <el-alert
-          v-if="costMissing"
-          class="drawer-alert"
-          type="error"
-          :closable="false"
-          show-icon
-          title="未关联成本分析，禁止提交审批"
-          description="请先在「成本核算」页签完成核价并保存版本，系统会自动回写核价单号后方可送审。"
-        />
-
-        <el-descriptions :column="2" border size="small">
-          <el-descriptions-item label="客户">{{ current.customerName }}</el-descriptions-item>
-          <el-descriptions-item label="客户编码">{{ current.customerCode }}</el-descriptions-item>
-          <el-descriptions-item label="产品">{{ current.productName }}</el-descriptions-item>
-          <el-descriptions-item label="图号 / 版本">
-            {{ current.drawingNo }} · {{ current.drawingVersion }}
-            <el-button
-              v-if="current.drawingVersionId"
-              link
-              type="primary"
-              class="preview-link"
-              @click="previewDrawing(current.drawingVersionId)"
-            >
-              预览图纸
-            </el-button>
-          </el-descriptions-item>
-          <el-descriptions-item label="材料">{{ current.material }}</el-descriptions-item>
-          <el-descriptions-item label="表面处理">{{ current.surfaceTreatment }}</el-descriptions-item>
-          <el-descriptions-item label="贸易条件">{{ current.tradeTerm }}</el-descriptions-item>
-          <el-descriptions-item label="目标交期">
-            {{ current.targetDeliveryDays }} 天
-          </el-descriptions-item>
-          <el-descriptions-item label="报价版本">{{ current.version }}</el-descriptions-item>
-          <el-descriptions-item label="阶段">
-            <el-tag size="small" :type="STAGE[current.stage].type">
-              {{ STAGE[current.stage].label }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="申请业务 / 报价工程师">
-            {{ current.applicant }} / {{ current.engineer ?? '待分派' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="数量口径">
-            {{ current.quantityMode === 'tier' ? '阶梯数量' : '单一数量' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="图纸（强制）" :span="2">
-            <template v-if="current.drawing">
-              <b class="drawing">{{ current.drawing.fileName }}</b>
-              <span class="muted">
-                　{{ current.drawing.version }} · {{ current.drawing.uploadedBy }} 于
-                {{ current.drawing.uploadedAt }} 上传
-              </span>
-              <div class="dist">
-                分发至：
-                <el-tag
-                  v-for="target in current.drawing.distributedTo"
-                  :key="target"
-                  size="small"
-                  effect="plain"
-                  class="dist__tag"
-                >
-                  {{ target }}
-                </el-tag>
-              </div>
-            </template>
-            <el-tag v-else type="danger" size="small">未上传图纸，禁止送审</el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="客户确认版本">
-            {{ current.confirmedVersion ?? '未确认' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="关联成本分析" :span="2">
-            <span v-if="current.costAnalysisNo" class="cost-no">{{ current.costAnalysisNo }}</span>
-            <el-tag v-else type="danger" size="small">未关联（必填）</el-tag>
-          </el-descriptions-item>
-        </el-descriptions>
-
-        <h3 class="drawer-title">阶梯报价</h3>
-        <el-table :data="current.tiers" size="small" border>
-          <el-table-column prop="quantity" label="数量（件）" />
-          <el-table-column label="单价">
-            <template #default="{ row }">{{ row.unitPrice }} {{ current?.currency }}</template>
-          </el-table-column>
-        </el-table>
-
-        <el-alert
-          v-if="current.grossMarginRate < 0.18"
-          class="drawer-alert"
-          type="warning"
-          :closable="false"
-          show-icon
-          title="毛利低于阈值，送审将触发会签"
-          description="按控制矩阵，低毛利报价需业务、工程、PMC、财务会签后由总经办批准。"
-        />
-
-        <DocTimeline class="drawer-timeline" title="节点计时（T0 起）" :nodes="current.timeline" />
-      </template>
-
-      <template #footer>
-        <template v-if="current">
-          <el-button v-if="costMissing" type="warning" @click="goCostAnalysis">去核价</el-button>
-          <el-button :disabled="costMissing">生成报价单 PDF</el-button>
-          <el-button @click="exportQuotations([current], false)">导出 Excel</el-button>
-          <el-button type="primary" :disabled="costMissing">提交审批</el-button>
-        </template>
-      </template>
-    </el-drawer>
+    <QuotationDetailDrawer
+      v-model="detailVisible"
+      :quotation="current"
+      :issuing="documentExport.issuing.value"
+      :stage-dict="STAGE"
+      @cost="goCostAnalysis"
+      @issue="current && issueDocument(current)"
+      @export="current && exportQuotations([current], false)"
+      @preview="previewDrawing"
+    />
   </div>
 </template>
 

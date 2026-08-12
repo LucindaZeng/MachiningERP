@@ -1,23 +1,39 @@
 <script setup lang="ts">
-import { Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 
-import { fetchCustomsDossiers, renderCustomsDocument } from '@/api/sales/customs.api'
+
+
+import { fetchDownloadUrl } from '@/api/file-preview.api'
+import {
+  DOC_KIND_BY_TEMPLATE,
+  fetchCustomsDossier,
+  fetchCustomsDossiers,
+  generateCustomsDocument,
+} from '@/api/sales/customs.api'
+import FilePreviewDialog from '@/components/FilePreviewDialog.vue'
 import { matchEq, matchText, type FilterField } from '@/components/filter-helpers'
 import FilterBar from '@/components/FilterBar.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { CUSTOMS_STATUS } from '@/components/status-dictionary'
 import StatusTag from '@/components/StatusTag.vue'
+import { useCustomsFlow } from '@/composables/use-customs-flow'
+import { useFilePreview } from '@/composables/use-file-preview'
 import { useResourceList } from '@/composables/use-resource-list'
 
+import CustomsCorrectDialog from './components/CustomsCorrectDialog.vue'
+import CustomsCreateDialog from './components/CustomsCreateDialog.vue'
+import CustomsDossierDrawer from './components/CustomsDossierDrawer.vue'
+
 import type { CustomsDossier } from '@/types/sales.types'
+
+
 
 const EXPORT_COLUMNS = [
   { label: '报关单号', value: 'docNo' },
   { label: '关联发货单', value: 'shipmentNo' },
   { label: '客户', value: 'customerName' },
-  { label: '贸易条件', value: 'tradeTerm' },
+  { label: '贸易条件', value: 'incoterm' },
   { label: '目的国', value: 'destination' },
   { label: '状态', value: 'status' },
   { label: '业务', value: 'owner' },
@@ -67,33 +83,94 @@ const { filtered, loading, keyword, filters, resetFilters, reload } = useResourc
 )
 
 const detailVisible = ref(false)
+const createVisible = ref(false)
+const correctVisible = ref(false)
 const current = ref<CustomsDossier | null>(null)
 const generating = ref(false)
+const filePreview = useFilePreview()
+const flow = useCustomsFlow()
 
-const canGenerate = computed(() => (current.value?.missingFields.length ?? 0) === 0)
-
-function openDetail(row: CustomsDossier): void {
+/**
+ * 打开详情时**再取一次单条**。
+ *
+ * 列表里那一份可能已经放了几分钟，而每个流转动作都要带 `versionLock` 出去——
+ * 拿旧版本号去申报，换来的是一句「已被他人修改」，而其实没有别人。
+ * 取不到就先用列表那份顶上：详情照样能看，动作失败时服务端还会再拦一次。
+ */
+async function openDetail(row: CustomsDossier): Promise<void> {
   current.value = row
   detailVisible.value = true
+  try {
+    current.value = await fetchCustomsDossier(row.id)
+  } catch {
+    // 保持列表里那份，不打断查看
+  }
 }
 
+/**
+ * 每个流转动作回来的都是**新的记录**，必须立刻换掉手里那份——
+ * 否则下一个动作会带着过期的 versionLock 出去，用户看到的是
+ * 「已被他人修改」，其实是自己上一步没刷新。列表同步重取。
+ */
+async function apply(action: Promise<CustomsDossier | null>): Promise<void> {
+  const updated = await action
+  if (!updated) return
+  current.value = updated
+  await reload()
+}
+
+/**
+ * 逐份出具。**永远是追加**——每调一次得到该文件的新版本，旧版原样留着。
+ * 数据包必须最后出：它引用商业发票、装箱单与合同，缺一份服务端会拒绝。
+ * 形式发票按需出具（预付／信用证客户），不在整包生成里。
+ */
 async function generateAll(): Promise<void> {
-  if (!current.value) {
-    return
-  }
+  const dossier = current.value
+  if (!dossier) return
+
   generating.value = true
   try {
-    for (const doc of current.value.documents) {
-      const result = await renderCustomsDocument(doc.templateCode)
-      doc.version = result.version
-      doc.generatedAt = result.generatedAt
+    let latest = dossier
+    for (const doc of dossier.documents) {
+      const kind = DOC_KIND_BY_TEMPLATE[doc.templateCode]
+      if (!kind || kind === 'PROFORMA_INVOICE') continue
+      latest = await generateCustomsDocument(latest.id, latest.versionLock ?? 0, kind)
     }
-    current.value.status = 'generated'
-    ElMessage.success('报关资料包已生成，已留版本快照并送关务复核')
+    current.value = latest
+    ElMessage.success('报关资料包已生成，各版本已留汇率快照')
     await reload()
+  } catch (error) {
+    // 服务端的齐套/前置闸门文案本身就是给业务看的，原样端出去
+    ElMessage.error(error instanceof Error ? error.message : '生成失败')
   } finally {
     generating.value = false
   }
+}
+
+async function previewDocument(documentId: string): Promise<void> {
+  await filePreview.open('customs-document', documentId)
+}
+
+/** 下载走 download-url：验权、短时效签名，并逐次留审计。 */
+async function downloadDocument(documentId: string): Promise<void> {
+  try {
+    const view = await fetchDownloadUrl('customs-document', documentId)
+    window.open(view.previewUrl, '_blank', 'noopener')
+  } catch (error) {
+    ElMessage.error(error instanceof Error ? error.message : '下载地址获取失败')
+  }
+}
+
+async function onCorrect(reason: string): Promise<void> {
+  if (!current.value) return
+  await apply(flow.correct(current.value, reason))
+  correctVisible.value = false
+}
+
+function onCreated(dossier: CustomsDossier): void {
+  void reload()
+  current.value = dossier
+  detailVisible.value = true
 }
 </script>
 
@@ -102,10 +179,10 @@ async function generateAll(): Promise<void> {
     <PageHeader
       title="报关资料"
       requirement-code="EXP-01 ~ EXP-04"
-      subtitle="业务在发货后生成形式发票、装箱单、报关单要素与出口合同，由 docgen 统一出文件并留版本快照，关务岗复核后申报。要素缺失时禁止生成。"
+      subtitle="业务在发货后建档并生成形式发票、商业发票、装箱单、出口合同与报关数据包，由 docgen 按受控模板出文件并留版本与汇率快照；关务岗复核后申报，申报即冻结清单快照。要素缺失时服务端禁止生成。"
     >
       <template #actions>
-        <el-button type="primary">新建报关资料</el-button>
+        <el-button type="primary" @click="createVisible = true">新建报关资料</el-button>
       </template>
     </PageHeader>
 
@@ -145,6 +222,11 @@ async function generateAll(): Promise<void> {
             <el-tag v-else type="success" size="small">已齐套</el-tag>
           </template>
         </el-table-column>
+        <el-table-column label="申报版本" width="100">
+          <template #default="{ row }">
+            {{ row.declarationVersion ? `V${row.declarationVersion}` : '未申报' }}
+          </template>
+        </el-table-column>
         <el-table-column label="状态" width="110">
           <template #default="{ row }">
             <StatusTag :dict="CUSTOMS_STATUS" :value="row.status" />
@@ -158,134 +240,47 @@ async function generateAll(): Promise<void> {
       </el-table>
     </el-card>
 
-    <el-drawer v-model="detailVisible" size="680px" :title="current?.docNo">
-      <template v-if="current">
-        <el-alert
-          v-if="current.missingFields.length"
-          class="drawer-alert"
-          type="error"
-          :closable="false"
-          show-icon
-          title="要素未齐套，禁止生成资料包"
-          :description="`缺失字段：${current.missingFields.join('、')}`"
-        />
+    <CustomsDossierDrawer
+      v-model="detailVisible"
+      :dossier="current"
+      :busy="flow.busy.value"
+      :generating="generating"
+      @generate="generateAll"
+      @submit-review="current && apply(flow.submitReview(current))"
+      @approve-review="current && apply(flow.approveReview(current))"
+      @return-for-fix="current && apply(flow.returnForFix(current))"
+      @declare="current && apply(flow.declare(current))"
+      @correct="correctVisible = true"
+      @receipt="current && apply(flow.archiveReceipt(current))"
+      @release="current && apply(flow.release(current))"
+      @preview="previewDocument"
+      @download="downloadDocument"
+    />
 
-        <h3 class="drawer-title">商品与贸易要素</h3>
-        <el-descriptions :column="2" border size="small">
-          <el-descriptions-item label="关联订单">{{ current.orderNo }}</el-descriptions-item>
-          <el-descriptions-item label="关联发货单">{{ current.shipmentNo }}</el-descriptions-item>
-          <el-descriptions-item label="中文品名">{{ current.goodsNameCn }}</el-descriptions-item>
-          <el-descriptions-item label="英文品名">{{ current.goodsNameEn }}</el-descriptions-item>
-          <el-descriptions-item label="HS 编码">{{ current.hsCode }}</el-descriptions-item>
-          <el-descriptions-item label="贸易方式">{{ current.tradeMode }}</el-descriptions-item>
-          <el-descriptions-item label="数量 / 单位">
-            {{ current.quantity }} {{ current.unit }}
-          </el-descriptions-item>
-          <el-descriptions-item label="件数">{{ current.packages }}</el-descriptions-item>
-          <el-descriptions-item label="净重 / 毛重（KG）">
-            {{ current.netWeight }} / {{ current.grossWeight }}
-          </el-descriptions-item>
-          <el-descriptions-item label="单价">
-            {{ current.unitPrice }} {{ current.totalAmount.currency }}
-          </el-descriptions-item>
-          <el-descriptions-item label="总金额">
-            {{ current.totalAmount.amount }} {{ current.totalAmount.currency }}
-          </el-descriptions-item>
-          <el-descriptions-item label="汇率">{{ current.exchangeRate }}</el-descriptions-item>
-          <el-descriptions-item label="贸易术语">{{ current.incoterm }}</el-descriptions-item>
-          <el-descriptions-item label="启运港">{{ current.portOfLoading }}</el-descriptions-item>
-          <el-descriptions-item label="目的地" :span="2">{{ current.destination }}</el-descriptions-item>
-          <el-descriptions-item label="关务复核" :span="2">
-            {{ current.checkedBy ?? '未复核' }}
-          </el-descriptions-item>
-        </el-descriptions>
+    <CustomsCreateDialog v-model="createVisible" @created="onCreated" />
 
-        <h3 class="drawer-title">系统生成文件</h3>
-        <el-table :data="current.documents" size="small" border>
-          <el-table-column prop="templateCode" label="模板编码" width="100" />
-          <el-table-column prop="name" label="文件" min-width="220">
-            <template #default="{ row }">
-              <el-icon class="doc-icon"><Document /></el-icon>{{ row.name }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="version" label="版本" width="70" />
-          <el-table-column label="生成时间" width="150">
-            <template #default="{ row }">{{ row.generatedAt ?? '未生成' }}</template>
-          </el-table-column>
-          <el-table-column label="操作" width="80">
-            <template #default="{ row }">
-              <el-button link type="primary" :disabled="!row.generatedAt">下载</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+    <CustomsCorrectDialog
+      v-model="correctVisible"
+      :busy="flow.busy.value"
+      @confirm="onCorrect"
+    />
 
-        <p class="drawer-note">
-          文件统一由 docgen 出（POST /documents/&#123;templateCode&#125;/render），返回受权限控制的短时效下载链接，
-          每次生成留版本快照；香港代生产订单沿用既有外贸规则，关务复核不可跳过。
-        </p>
-
-      </template>
-
-      <template #footer>
-        <template v-if="current">
-            <el-button>送关务复核</el-button>
-            <el-button
-              type="primary"
-              :loading="generating"
-              :disabled="!canGenerate"
-              @click="generateAll"
-            >
-              生成报关资料包
-            </el-button>
-        </template>
-      </template>
-    </el-drawer>
+    <FilePreviewDialog
+      v-model="filePreview.visible.value"
+      :loading="filePreview.loading.value"
+      :preview="filePreview.preview.value"
+      :unsupported="filePreview.unsupported.value"
+      :error-message="filePreview.errorMessage.value"
+      @close="filePreview.close"
+      @download="filePreview.download"
+    />
   </div>
 </template>
 
 <style scoped>
-.toolbar {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  margin-bottom: 14px;
-}
-
-.toolbar__hint {
-  margin-left: auto;
-  font-size: 12px;
-  color: var(--wfx-text-muted);
-}
-
 .doc-no {
   font-weight: 600;
   color: var(--wfx-navy);
-}
-
-.drawer-title {
-  margin: 22px 0 10px;
-  font-size: 14px;
-  color: var(--wfx-text-strong);
-}
-
-.drawer-alert {
-  margin-bottom: 8px;
-}
-
-.doc-icon {
-  margin-right: 6px;
-  color: var(--wfx-navy);
-}
-
-.drawer-note {
-  margin: 14px 0 0;
-  padding: 10px 12px;
-  font-size: 12px;
-  line-height: 1.8;
-  color: var(--wfx-text-muted);
-  background: var(--wfx-surface-alt);
-  border-left: 3px solid var(--wfx-orange);
-  border-radius: 4px;
 }
 
 :deep(.el-table__row) {

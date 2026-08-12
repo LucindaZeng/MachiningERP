@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { ShareItem } from '@/api/mock/sales/analytics.fixture'
+import type { ShareItem } from '@machining-erp/shared'
 
 const props = defineProps<{ items: ShareItem[]; unit: string }>()
 

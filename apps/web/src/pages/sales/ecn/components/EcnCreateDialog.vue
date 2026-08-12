@@ -1,12 +1,19 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
+import { ElMessage } from 'element-plus'
+import { computed, reactive, ref } from 'vue'
 
+import { SERVER_CHANGE_TYPE, createEngineeringChange } from '@/api/sales/ecn.api'
 import DraftToolbar from '@/components/DraftToolbar.vue'
 import { ECN_CHANGE_TYPE } from '@/components/status-dictionary'
 import { useFormDraft } from '@/composables/use-form-draft'
 
+import type { EngineeringChange } from '@/types/sales.types'
+
 const props = defineProps<{ modelValue: boolean }>()
-const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
+const emit = defineEmits<{
+  'update:modelValue': [boolean]
+  created: [change: EngineeringChange]
+}>()
 
 const visible = computed({
   get: () => props.modelValue,
@@ -25,7 +32,61 @@ const createForm = reactive({
   beforeValue: '',
   afterValue: '',
   reason: '',
+  /** 改图必填：新版图纸经报价模块既有的上传通道产生，ECN 不另建上传路径 */
+  newDrawingVersionId: '',
 })
+
+const submitting = ref(false)
+
+const REQUIRED: Array<[keyof typeof createForm, string]> = [
+  ['customerCode', '客户'],
+  ['product', '产品名称'],
+  ['drawingNo', '图号'],
+  ['beforeValue', '变更前'],
+  ['afterValue', '变更后'],
+  ['reason', '变更原因'],
+]
+
+/**
+ * 提交。
+ *
+ * 受理范围与样品阶段两道闸门都在**服务端**，这里不预判——预判会漏，
+ * 而且服务端的拒绝消息里带着「该走哪条路」，比前端自己编的提示有用得多。
+ */
+async function submit(): Promise<void> {
+  const missing = REQUIRED.filter(([key]) => String(createForm[key] ?? '').trim() === '').map(
+    ([, label]) => label,
+  )
+  if (missing.length) {
+    ElMessage.warning(`请填写：${missing.join('、')}`)
+    return
+  }
+
+  submitting.value = true
+  try {
+    const created = await createEngineeringChange({
+      customerId: createForm.customerCode,
+      orderId: createForm.orderNo || null,
+      productName: createForm.product,
+      drawingNo: createForm.drawingNo,
+      newDrawingVersionId: createForm.newDrawingVersionId || null,
+      changeType: SERVER_CHANGE_TYPE[createForm.changeType] ?? createForm.changeType,
+      origin: createForm.origin === 'customer' ? 'CUSTOMER' : 'INTERNAL',
+      urgent: createForm.urgent,
+      beforeValue: createForm.beforeValue,
+      afterValue: createForm.afterValue,
+      reason: createForm.reason,
+    })
+    ElMessage.success(`变更申请 ${created.docNo} 已提交工程评估`)
+    emit('created', created)
+    visible.value = false
+  } catch (error) {
+    // 越界类型、样品阶段等拒绝消息里带着正确去处，原样显示
+    ElMessage.error(error instanceof Error ? error.message : '提交失败')
+  } finally {
+    submitting.value = false
+  }
+}
 
 const {
   drafts,
@@ -90,6 +151,12 @@ const {
       <el-form-item label="变更原因" required>
         <el-input v-model="createForm.reason" type="textarea" :rows="2" />
       </el-form-item>
+      <el-form-item v-if="createForm.changeType === 'drawing'" label="新版图纸版本 ID" required>
+        <el-input
+          v-model="createForm.newDrawingVersionId"
+          placeholder="经「报价管理 → 图纸上传」产生的版本 ID"
+        />
+      </el-form-item>
     </el-form>
 
     <template #footer>
@@ -103,7 +170,7 @@ const {
         />
         <div>
           <el-button @click="visible = false">取消</el-button>
-          <el-button type="primary" @click="visible = false">提交工程评估</el-button>
+          <el-button type="primary" :loading="submitting" @click="submit">提交工程评估</el-button>
         </div>
       </div>
     </template>

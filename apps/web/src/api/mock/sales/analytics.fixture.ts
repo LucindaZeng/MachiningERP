@@ -1,52 +1,11 @@
-export interface TrendPoint {
-  label: string
-  /** 订单额，万元 */
-  amount: number
-  orders: number
-}
+/**
+ * 类型已迁到 `@machining-erp/shared`（development-guide §1：packages/shared 承载前后端共享契约）。
+ * 本文件只保留 **mock 数据**——真实接口未接通时的回落数据源，形状由 shared 保证与后端一致。
+ */
+import type {
+  SalesAnalytics,
+} from '@machining-erp/shared'
 
-export interface RankItem {
-  label: string
-  value: number
-  hint: string
-}
-
-export interface ShareItem {
-  key: string
-  label: string
-  value: number
-}
-
-export interface FunnelStage {
-  label: string
-  value: number
-  hint: string
-}
-
-export interface MarginRow {
-  customer: string
-  amount: string
-  quotedMargin: number
-  actualMargin: number
-  gap: number
-  risk: string
-}
-
-export interface SalesAnalytics {
-  headline: {
-    ytdAmount: string
-    ytdGrowth: string
-    marginRate: string
-    marginTarget: string
-    onTimeRate: string
-    overdueAr: string
-  }
-  trend: TrendPoint[]
-  topCustomers: RankItem[]
-  orderMix: ShareItem[]
-  funnel: FunnelStage[]
-  margins: MarginRow[]
-}
 
 /** 数据分析（BI）看板 mock：口径与来源单据见页面底部说明表。 */
 export const SALES_ANALYTICS: SalesAnalytics = {

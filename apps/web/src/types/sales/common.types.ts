@@ -23,22 +23,8 @@ export interface Money {
   currency: string
 }
 
-export type AlertLevel = 'info' | 'due' | 'overdue' | 'severe' | 'blocking'
-
-export interface AlertItem {
-  id: string
-  level: AlertLevel
-  domain: string
-  subject: string
-  triggerValue: string
-  threshold: string
-  occurredAt: string
-  dueAt: string
-  owner: string
-  escalateTo: string
-  relatedDocNo: string
-  suggestion: string
-}
+/** 预警等级与待办/预警形状已迁到 shared（前后端共享契约），这里再导出保持引用路径不变。 */
+export type { AlertItem, AlertLevel, TodoItem } from '@machining-erp/shared'
 
 export type TimelineState = 'done' | 'active' | 'pending' | 'overdue'
 
@@ -58,13 +44,4 @@ export interface TimelineNode {
   remark?: string
 }
 
-export interface TodoItem {
-  id: string
-  category: string
-  title: string
-  docNo: string
-  customer: string
-  dueAt: string
-  level: AlertLevel
-  route: string
-}
+

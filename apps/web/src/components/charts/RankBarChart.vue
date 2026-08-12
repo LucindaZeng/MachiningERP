@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
-import type { RankItem } from '@/api/mock/sales/analytics.fixture'
+import type { RankItem } from '@machining-erp/shared'
 
 const props = defineProps<{ items: RankItem[]; unit: string }>()
 

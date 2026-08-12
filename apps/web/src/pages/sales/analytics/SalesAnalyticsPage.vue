@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 
+
 import {
   fetchCostReports,
   fetchDailyOps,
@@ -30,12 +31,8 @@ import SlaPanel from './components/SlaPanel.vue'
 import StockPanel from './components/StockPanel.vue'
 import VariancePanel from './components/VariancePanel.vue'
 
-import type { CostReports } from '@/api/mock/sales/analytics-cost.fixture'
-import type { MarketReports } from '@/api/mock/sales/analytics-market.fixture'
-import type { OrderExtraReports } from '@/api/mock/sales/analytics-order.fixture'
-import type { SalesReports } from '@/api/mock/sales/analytics-reports.fixture'
-import type { SalesAnalytics } from '@/api/mock/sales/analytics.fixture'
-import type { DailyOpsReport } from '@/api/mock/sales/daily-ops.fixture'
+import type { CostReports, MarketReports , OrderExtraReports , SalesReports , SalesAnalytics , DailyOpsReport  } from '@machining-erp/shared'
+
 
 
 

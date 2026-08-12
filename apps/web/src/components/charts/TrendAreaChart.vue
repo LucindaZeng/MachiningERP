@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
-import type { TrendPoint } from '@/api/mock/sales/analytics.fixture'
+import type { TrendPoint } from '@machining-erp/shared'
 
 const props = defineProps<{ points: TrendPoint[]; unit: string }>()
 

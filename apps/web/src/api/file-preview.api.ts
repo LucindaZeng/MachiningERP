@@ -4,7 +4,12 @@ import { request } from './http'
  * 在线预览（kkFileView）。文件按 `(ownerType, ownerId)` 定位——
  * 系统里还没有统一的文件表，前端传的是「哪张单据上的哪个文件位」。
  */
-export type PreviewOwnerType = 'drawing-version' | 'order-customer-po'
+export type PreviewOwnerType =
+  | 'drawing-version'
+  | 'order-customer-po'
+  | 'customs-document'
+  /** docgen 生成物：报价单、成本分析、对账单与合并比较表 */
+  | 'generated-document'
 
 export interface PreviewUrlView {
   previewUrl: string

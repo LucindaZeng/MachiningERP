@@ -10,11 +10,15 @@ import { PrismaModule } from './infrastructure/prisma/prisma.module'
 import { AuthModule, JwtAuthGuard, PermissionsGuard } from './modules/auth'
 import { BomRequestModule } from './modules/bom-request'
 import { ContractOrderModule } from './modules/contract-order'
+import { CustomsModule } from './modules/customs'
+import { DocgenModule } from './modules/docgen'
+import { EcnRequestModule } from './modules/ecn-request'
 import { IdentityModule } from './modules/identity'
 import { InvoiceRequestModule } from './modules/invoice-request'
 import { MasterdataModule } from './modules/masterdata'
 import { OrgModule } from './modules/org'
 import { QuotationModule } from './modules/quotation'
+import { SalesAnalyticsModule } from './modules/sales-analytics'
 import { SalesReturnModule } from './modules/sales-return'
 import { ShipmentModule } from './modules/shipment'
 import { AuditModule } from './platform/audit'
@@ -53,6 +57,10 @@ import { TimelineModule } from './platform/timeline'
     ShipmentModule,
     InvoiceRequestModule,
     SalesReturnModule,
+    CustomsModule,
+    DocgenModule,
+    EcnRequestModule,
+    SalesAnalyticsModule,
   ],
   providers: [
     { provide: APP_FILTER, useClass: BizExceptionFilter },

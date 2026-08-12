@@ -1990,3 +1990,397 @@ model SalesReturnLine {
   @@index([batchNo])
   @@map("sales_return_lines")
 }
+
+/// 报关资料状态（业务规格第 10 章，与前端 CustomsStatus 一一对应）。
+/// 申报（DECLARED）是不可变边界：在此之前改文件是日常迭代，在此之后必须走更正记录。
+enum CustomsStatus {
+  DRAFT
+  CHECKING
+  GENERATED
+  DECLARED
+  RELEASED
+
+  @@map("customs_status")
+}
+
+/// 报关文件种类（业务规格第 10 章）。
+///
+/// **形式发票与商业发票是两份不同的单据**，不是一份的两种叫法：
+/// 形式发票在出货前按订单数据开，用途是开信用证与收预付款；
+/// 商业发票在出货后按实发数量与重量开，是海关据以清关的那一份。
+/// 报关数据包引用的永远是**商业**发票。
+enum CustomsDocKind {
+  PROFORMA_INVOICE
+  COMMERCIAL_INVOICE
+  PACKING_LIST
+  CONTRACT
+  DATA_PACK
+
+  @@map("customs_doc_kind")
+}
+
+/// 报关资料（EXP-01~04）。外贸出货在发货后生成整包资料，关务复核后申报。
+model CustomsDossier {
+  id    String @id @default(uuid()) @db.Uuid
+  docNo String @unique @map("doc_no") @db.VarChar(32)
+
+  shipmentId String @map("shipment_id") @db.Uuid
+  orderId    String @map("order_id") @db.Uuid
+  customerId String @map("customer_id") @db.Uuid
+
+  /// 贸易要素
+  tradeMode      String  @map("trade_mode") @db.VarChar(32)
+  incoterm       String  @db.VarChar(32)
+  portOfLoading  String  @map("port_of_loading") @db.VarChar(64)
+  destination    String  @db.VarChar(128)
+  /// 目的港代码与唛头：清关必需要素，齐套校验会点名要它们
+  destinationPortCode String? @map("destination_port_code") @db.VarChar(16)
+  shippingMarks       String? @map("shipping_marks") @db.VarChar(500)
+
+  /// 商品要素
+  hsCode      String  @map("hs_code") @db.VarChar(16)
+  goodsNameCn String  @map("goods_name_cn") @db.VarChar(128)
+  goodsNameEn String? @map("goods_name_en") @db.VarChar(128)
+  quantity    Decimal @db.Decimal(18, 6)
+  unit        String  @db.VarChar(16)
+  netWeight   Decimal @map("net_weight") @db.Decimal(18, 3)
+  grossWeight Decimal @map("gross_weight") @db.Decimal(18, 3)
+  packages    Int
+
+  currency         String @db.VarChar(8)
+  unitPriceMinor   BigInt @map("unit_price_minor")
+  totalAmountMinor BigInt @map("total_amount_minor")
+  /// 单据上的汇率是**每份文件各自出具时的快照**（见 CustomsDocument.exchangeRate）；
+  /// 这里存的是资料包建档时的当日汇率，只作缺省值与展示
+  exchangeRate     Decimal @map("exchange_rate") @db.Decimal(18, 6)
+
+  status        CustomsStatus @default(DRAFT)
+  ownerUserCode String        @map("owner_user_code") @db.VarChar(32)
+
+  /// 关务复核不可跳过
+  checkedBy String?   @map("checked_by") @db.VarChar(32)
+  checkedAt DateTime? @map("checked_at")
+
+  /// 已申报的次数；每次更正后重新申报递增。0 = 尚未申报
+  declarationVersion Int       @default(0) @map("declaration_version")
+  declaredAt         DateTime? @map("declared_at")
+  releasedAt         DateTime? @map("released_at")
+
+  documents    CustomsDocument[]
+  declarations CustomsDeclaration[]
+  corrections  CustomsCorrection[]
+
+  createdBy   String?  @map("created_by") @db.VarChar(32)
+  updatedBy   String?  @map("updated_by") @db.VarChar(32)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  versionLock Int      @default(0) @map("version_lock")
+
+  @@index([customerId, status])
+  @@index([shipmentId])
+  @@index([orderId])
+  @@map("customs_dossiers")
+}
+
+/// 报关文件的一个**版本**。每次生成产生新的一行，旧行原样保留——
+/// 「已提交版本只能更正或生成新版本，不能覆盖」（业务规格第 10 章）。
+model CustomsDocument {
+  id        String         @id @default(uuid()) @db.Uuid
+  dossierId String         @map("dossier_id") @db.Uuid
+  kind      CustomsDocKind
+  version   Int
+
+  /// 文件落在 object-storage 上的位置；生成失败或尚未出文件时为空
+  objectKey String? @map("object_key") @db.VarChar(512)
+  fileName  String? @map("file_name") @db.VarChar(256)
+
+  /// **每份文件在自己出具的那一刻各留一份汇率快照**（业务规格第 10 章
+  /// 「汇率取当日汇率表并保存快照」）。同一个资料包里先后出的两份文件汇率可以不同，
+  /// 这不是 bug——它们本来就是不同日子出具的单据。
+  exchangeRate Decimal @map("exchange_rate") @db.Decimal(18, 6)
+  currency     String  @db.VarChar(8)
+
+  generatedAt DateTime @default(now()) @map("generated_at")
+  generatedBy String   @map("generated_by") @db.VarChar(32)
+
+  dossier CustomsDossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  @@unique([dossierId, kind, version])
+  @@index([dossierId, kind])
+  @@map("customs_documents")
+}
+
+/// 一次申报的**清单快照**：这一版申报到底送出去了哪几份文件的哪几版。
+///
+/// 单独一张表而不是几个字段，是因为「送出去的是什么」必须能原样复现——
+/// 事后任何一份文件再出新版都不允许改动这张快照。
+model CustomsDeclaration {
+  id        String @id @default(uuid()) @db.Uuid
+  dossierId String @map("dossier_id") @db.Uuid
+  version   Int
+
+  declaredAt DateTime @map("declared_at")
+  declaredBy String   @map("declared_by") @db.VarChar(32)
+
+  /// 申报回执归档（业务规格第 10 章）；按申报版本各自挂各自的回执
+  receiptNo String?   @map("receipt_no") @db.VarChar(64)
+  receiptAt DateTime? @map("receipt_at")
+
+  lines   CustomsDeclarationLine[]
+  dossier CustomsDossier          @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  @@unique([dossierId, version])
+  @@map("customs_declarations")
+}
+
+/// 申报清单的一行：某种文件的某一版被这次申报纳入。
+model CustomsDeclarationLine {
+  id            String         @id @default(uuid()) @db.Uuid
+  declarationId String         @map("declaration_id") @db.Uuid
+  kind          CustomsDocKind
+  version       Int
+
+  declaration CustomsDeclaration @relation(fields: [declarationId], references: [id], onDelete: Cascade)
+
+  @@unique([declarationId, kind])
+  @@map("customs_declaration_lines")
+}
+
+/// 申报之后的更正记录。**理由必填**——已申报的资料是对海关的正式陈述，
+/// 改它必须说得清为什么（业务规格第 10 章「只能更正或生成新版本」）。
+///
+/// 申报之前的重新生成不进这张表：那是日常迭代，有审计日志就够了，
+/// 强制填理由只会逼出一堆「修改」二字的样板文字。
+model CustomsCorrection {
+  id        String @id @default(uuid()) @db.Uuid
+  dossierId String @map("dossier_id") @db.Uuid
+  sequence  Int
+
+  reason String @db.VarChar(500)
+  /// 本次更正重出了哪几份文件、从哪一版到哪一版
+  lines  CustomsCorrectionLine[]
+
+  /// 更正后重新申报所产生的申报版本号
+  resultingDeclarationVersion Int @map("resulting_declaration_version")
+
+  createdBy String   @map("created_by") @db.VarChar(32)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  dossier CustomsDossier @relation(fields: [dossierId], references: [id], onDelete: Cascade)
+
+  @@unique([dossierId, sequence])
+  @@map("customs_corrections")
+}
+
+model CustomsCorrectionLine {
+  id           String         @id @default(uuid()) @db.Uuid
+  correctionId String         @map("correction_id") @db.Uuid
+  kind         CustomsDocKind
+  fromVersion  Int            @map("from_version")
+  toVersion    Int            @map("to_version")
+
+  correction CustomsCorrection @relation(fields: [correctionId], references: [id], onDelete: Cascade)
+
+  @@unique([correctionId, kind])
+  @@map("customs_correction_lines")
+}
+
+/* ============================== docgen 单据出具 ============================== */
+
+/// 一次**出具**的留痕。
+///
+/// 为什么要有这张表：development-guide §6.1 要求「新文件种类必须能在线预览」，
+/// 而预览按 `(ownerType, ownerId)` 定位——没有行就没有 ownerId，预览就接不上。
+/// 顺带解决第二件事：客户拿着半年前那份报价单来问「这数怎么来的」，
+/// 得先知道它是**哪一版模板**出的。
+///
+/// ⚠️ 它**不是单据**，是单据的生成物，因此**刻意没有** doc_no / 状态机 / 乐观锁：
+/// development-guide 第 4 节那三样是对「有生命周期的单据」的要求。
+/// 这里的一行一旦写下就不再变化——要新的就再出一份，旧的原样留着，
+/// 与报关文件版本链、发票红冲是同一条「已出具即不可变」的规矩。
+model GeneratedDocument {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// 出具所依据的单据。不做外键：docgen 服务于所有模块的单据，
+  /// 逐一建关系会把这张表变成全库的汇合点，反而绑死了模块边界。
+  sourceType String @map("source_type") @db.VarChar(32)
+  sourceId   String @map("source_id") @db.Uuid
+  /// 冗余一份来源单号，供列表直接展示与审计认单，免去回查
+  sourceDocNo String @map("source_doc_no") @db.VarChar(64)
+
+  templateId      String @map("template_id") @db.VarChar(64)
+  /// 出具时模板是第几版——模板改版后旧文件要能解释得清
+  templateVersion Int    @map("template_version")
+
+  objectKey String @map("object_key") @db.VarChar(512)
+  fileName  String @map("file_name") @db.VarChar(256)
+  sizeBytes Int    @map("size_bytes")
+
+  /// 合并导出时被合进来的单据份数；单份出具为 1
+  documentCount Int @default(1) @map("document_count")
+
+  generatedAt DateTime @default(now()) @map("generated_at")
+  generatedBy String   @map("generated_by") @db.VarChar(32)
+
+  @@index([sourceType, sourceId])
+  @@index([generatedBy, generatedAt])
+  @@map("generated_documents")
+}
+
+/* ============================== ECN 工程变更申请 ============================== */
+
+/// ECN 受理的变更类型（业务规格第 6 章）。
+///
+/// **只受理「产品本身」的变更**：改图、改材料、改表面处理，以及由此必须
+/// 同步的工艺路线变更。数量 / 交期 / 收货信息 / 包装走订单修改申请（ORC），
+/// 价格走报价单修改申请（QRC）——这三条边界由服务端硬拦，见 ecn-scope.rules.ts。
+///
+/// `PROCESS` 单列而不是并进 DRAWING：内部发起的工序改善（换装夹、并工序）
+/// 图纸并不变，却真实存在且要限批次生效。把它塞进改图，等于逼人伪造一次图纸变更。
+enum EcnChangeType {
+  DRAWING
+  MATERIAL
+  SURFACE
+  PROCESS
+
+  @@map("ecn_change_type")
+}
+
+enum EcnOrigin {
+  CUSTOMER
+  INTERNAL
+
+  @@map("ecn_origin")
+}
+
+/// 八态，与前端 `EcnStatus` 一一对应——界面是设计基线，后端照着它建。
+enum EcnStatus {
+  DRAFT
+  SUBMITTED
+  ASSESSING
+  REVIEWING
+  APPROVED
+  EXECUTING
+  CLOSED
+  REJECTED
+
+  @@map("ecn_status")
+}
+
+/// 影响范围四项。固定枚举而非自由文本：这四项是**评估完整性的判据**
+/// （四项齐了才允许送会签），自由文本没法判断「评没评全」。
+enum EcnImpactScope {
+  /// 在制工单
+  WIP
+  /// 已采购物料
+  PURCHASED
+  /// 已完工库存
+  FINISHED_STOCK
+  /// 已发货批次
+  SHIPPED
+
+  @@map("ecn_impact_scope")
+}
+
+model EcnRequest {
+  id    String @id @default(uuid()) @db.Uuid
+  docNo String @unique @map("doc_no") @db.VarChar(64)
+
+  customerId String  @map("customer_id") @db.Uuid
+  /// 可空：内部发起的工艺改善未必挂在某一张订单上
+  orderId    String? @map("order_id") @db.Uuid
+
+  productName String @map("product_name") @db.VarChar(128)
+  drawingNo   String @map("drawing_no") @db.VarChar(64)
+
+  /// 变更链路：图纸版本 ↔ BOM ↔ 报价版本，三者串起来才追得到「这个改动从哪来、影响到谁」
+  drawingVersionId    String? @map("drawing_version_id") @db.Uuid
+  /// 改图后的新版本；由 quotation 的图纸上传通道产生，本模块不另建上传路径
+  newDrawingVersionId String? @map("new_drawing_version_id") @db.Uuid
+  bomRequestId        String? @map("bom_request_id") @db.Uuid
+  quotationId         String? @map("quotation_id") @db.Uuid
+
+  changeType EcnChangeType @map("change_type")
+  origin     EcnOrigin
+  urgent     Boolean       @default(false)
+
+  beforeValue String @map("before_value") @db.VarChar(1000)
+  afterValue  String @map("after_value") @db.VarChar(1000)
+  reason      String @db.VarChar(1000)
+
+  /// 改图必须联动改工艺路线；未同步不允许批准发布（第 6 章硬规则）
+  routingUpdated Boolean @default(false) @map("routing_updated")
+  /// 中途改工序只能对指定批次版本生效，否则已投产批次会被无声地改掉
+  effectiveBatch String? @map("effective_batch") @db.VarChar(64)
+
+  /// 只做标记与提醒，**不代建** QRC / ORC：重新核价要填成本变化、
+  /// 订单修改要填改什么，这些信息 ECN 里没有，代建只会产出一批空壳单据。
+  needRequote         Boolean @default(false) @map("need_requote")
+  needOrderReapproval Boolean @default(false) @map("need_order_reapproval")
+
+  status        EcnStatus @default(DRAFT)
+  ownerUserCode String    @map("owner_user_code") @db.VarChar(32)
+
+  submittedAt  DateTime? @map("submitted_at")
+  assessedBy   String?   @map("assessed_by") @db.VarChar(32)
+  assessedAt   DateTime? @map("assessed_at")
+  approvedBy   String?   @map("approved_by") @db.VarChar(32)
+  approvedAt   DateTime? @map("approved_at")
+  closedAt     DateTime? @map("closed_at")
+  rejectReason String?   @map("reject_reason") @db.VarChar(500)
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  createdBy   String   @map("created_by") @db.VarChar(32)
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") @db.VarChar(32)
+  versionLock Int      @default(0) @map("version_lock")
+
+  impacts  EcnImpact[]
+  signoffs EcnSignoff[]
+
+  @@index([customerId, status])
+  @@index([orderId])
+  @@index([ownerUserCode, status])
+  @@map("ecn_requests")
+}
+
+model EcnImpact {
+  id    String         @id @default(uuid()) @db.Uuid
+  ecnId String         @map("ecn_id") @db.Uuid
+  scope EcnImpactScope
+
+  /// 数量是**描述性文字**而非数字：真实评估写的是「1200 件」「304 棒料 620kg」
+  /// 「5000 件用量」，单位与口径各不相同，强行数字化会丢掉评估本身的信息
+  quantity String @db.VarChar(128)
+  /// 金额影响；评不出金额时为空（前端显示为「—」），**不填 0**——
+  /// 0 是「评估过且为零」，空是「这一项算不出钱」，两者在返工决策里含义相反
+  amountMinor BigInt? @map("amount_minor")
+  note        String  @db.VarChar(500)
+
+  ecn EcnRequest @relation(fields: [ecnId], references: [id], onDelete: Cascade)
+
+  @@unique([ecnId, scope])
+  @@map("ecn_impacts")
+}
+
+/// 跨部门会签（ECN-03）。
+///
+/// ⚠️ PMC / 采购 / 生产 / 品质 / 财务五个模块尚未上线，现阶段由工程岗代签，
+/// 每条记录都会写明代签人。表结构按最终形态建，各部门模块上线时只换签收人来源，
+/// 状态机与端点契约不动——与分析层那四个 STUB 读端口同一套做法。
+model EcnSignoff {
+  id         String @id @default(uuid()) @db.Uuid
+  ecnId      String @map("ecn_id") @db.Uuid
+  department String @db.VarChar(32)
+
+  signedBy String?   @map("signed_by") @db.VarChar(32)
+  signedAt DateTime? @map("signed_at")
+  opinion  String?   @db.VarChar(500)
+  /// 是否由工程代签（各部门模块未上线期间为 true），审计里要能一眼看出来
+  proxied  Boolean   @default(false)
+
+  ecn EcnRequest @relation(fields: [ecnId], references: [id], onDelete: Cascade)
+
+  @@unique([ecnId, department])
+  @@map("ecn_signoffs")
+}

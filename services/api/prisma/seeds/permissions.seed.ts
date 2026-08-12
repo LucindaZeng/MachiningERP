@@ -16,6 +16,7 @@ export const PERMISSIONS = [
   { code: PERMISSION_CODES.ORDER_APPROVE, name: '订单审核', category: 'order', description: '业务经理' },
   { code: PERMISSION_CODES.STOCK_ORDER_GM_APPROVE, name: '备料订单总经办审批', category: 'order', description: '无论金额大小必须经总经办批准' },
   { code: PERMISSION_CODES.ORDER_TRACKING_VIEW, name: '订单追踪查看', category: 'order', description: '业务部 / 总经办 / PMC 三方可见' },
+  { code: PERMISSION_CODES.CUSTOMS_DECLARE, name: '报关要素复核与申报', category: 'trade', description: '关务岗；复核不可跳过，建档人不得自审' },
   { code: PERMISSION_CODES.QUALITY_RMA_JUDGE, name: '客诉责任归属判定与 8D', category: 'quality', description: '业务登记客诉、品质判定责任；登记人不得自判' },
   { code: PERMISSION_CODES.IT_ACCOUNT_ADMIN, name: 'IT 账号管理', category: 'system', description: '账户申请审批、密码重置' },
 ] as const

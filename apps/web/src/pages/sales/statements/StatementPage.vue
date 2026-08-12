@@ -2,12 +2,14 @@
 import { ElMessage } from 'element-plus'
 import { computed, ref } from 'vue'
 
+import { issueStatementDocument } from '@/api/sales/docgen.api'
 import { fetchStatements } from '@/api/sales/statement.api'
 import { matchDateRange, matchEq, type FilterField } from '@/components/filter-helpers'
 import FilterBar from '@/components/FilterBar.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import { STATEMENT_STATUS } from '@/components/status-dictionary'
 import StatusTag from '@/components/StatusTag.vue'
+import { useDocumentExport } from '@/composables/use-document-export'
 import { useResourceList } from '@/composables/use-resource-list'
 
 import type { Statement } from '@/types/sales.types'
@@ -103,6 +105,17 @@ const unmatchedCount = computed(
 const totalDifference = computed(() =>
   filtered.value.reduce((sum, row) => sum + Math.abs(Number(row.differenceAmount)), 0).toFixed(2),
 )
+
+const documentExport = useDocumentExport()
+
+/** 按受控模板出具对账单。PDF 待 doc-render 侧车上线，届时由同一份 Excel 转出。 */
+async function issueStatement(): Promise<void> {
+  const id = current.value?.id
+  if (!id) {
+    return
+  }
+  await documentExport.issue(() => issueStatementDocument(id), '对账单')
+}
 
 function openDetail(row: Statement): void {
   current.value = row
@@ -278,14 +291,19 @@ function sendStatement(): void {
         </el-table>
 
         <p class="drawer-note">
-          对账单由 docgen 统一生成 PDF 并留版本快照，可推送至客户门户在线确认；客户确认后金额锁定，
-          差异行需先由业务与财务处理（红字发票、折让或挂账）再重新出单，不允许直接改写已确认对账单。
+          对账单由 docgen 按受控模板出具（当前为 Excel，留生成记录与模板版本），可在线预览与下载，
+          并可推送至客户门户在线确认；客户确认后金额锁定，差异行需先由业务与财务处理
+          （红字发票、折让或挂账）再重新出单，不允许直接改写已确认对账单。
+          <strong>PDF 版本待 doc-render 侧车上线后由同一份 Excel 转出</strong>，
+          在此之前可在预览页直接打印为 PDF。
         </p>
       </template>
 
       <template #footer>
         <template v-if="current">
-          <el-button>导出对账单 PDF</el-button>
+          <el-button :loading="documentExport.issuing.value" @click="issueStatement">
+            出具对账单
+          </el-button>
           <el-button
             type="primary"
             :disabled="Number(current.differenceAmount) !== 0"

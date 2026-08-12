@@ -80,6 +80,12 @@ export const ROLES = [
     ],
   },
   {
+    code: 'CUSTOMS_BROKER',
+    name: '关务岗',
+    description: '报关要素复核、申报与回执归档；业务建档、关务复核，两者不得由同一人完成',
+    permissions: [PERMISSION_CODES.CUSTOMS_DECLARE, PERMISSION_CODES.ORDER_TRACKING_VIEW],
+  },
+  {
     code: 'QUALITY_ENGINEER',
     name: '品质工程师',
     description: '客诉责任归属判定、8D 关闭；业务登记、品质判定，两者不得由同一人完成',

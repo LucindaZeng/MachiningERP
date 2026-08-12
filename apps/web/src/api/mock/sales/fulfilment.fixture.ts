@@ -12,14 +12,16 @@ export const SHIPMENTS: Shipment[] = [
       { seq: 2, productName: '探头支架安装座', drawingNo: 'RX-3391', itemCode: 'P-RX3391-A-01', batchNo: 'B26071503', orderedQty: '1500', shippedQty: '1500', tailQty: '0', amount: '11250.00' },
     ],
     batchNo: 'B26071502',
-    orderedQty: '1500',
-    qualifiedQty: '1486',
-    packedQty: '1486',
+    // 单头是两行的**汇总**：1500+1500 下单、1486+1500 合格与已包装、14+0 尾数
+    orderedQty: '3000',
+    qualifiedQty: '2986',
+    packedQty: '2986',
     shippedQty: '0',
     tailQty: '14',
     tailPlan: 'rework',
     packedAt: '2026-07-27 15:20',
-    amount: { amount: '37001.40', currency: 'USD' },
+    // 37001.40 + 11250.00；原先误取了第一行的金额
+    amount: { amount: '48251.40', currency: 'USD' },
     status: 'packed',
     owner: '陈志强',
     timeline: [
@@ -117,19 +119,26 @@ export const SALES_RETURNS: SalesReturn[] = [
     id: 'RT1',
     docNo: 'RMA-20260726-0009',
     lines: [
-      { seq: 1, productName: '导轨压板', drawingNo: 'MT-7601', batchNo: 'B26070901', returnQty: '120', reason: '平面度超差', amount: '4776.00' },
-      { seq: 2, productName: '定位销座', drawingNo: 'MT-7420', batchNo: 'B26070902', returnQty: '30', reason: '镀锌层附着力不良', amount: '648.00' },
+      { seq: 1, productName: '导轨压板', drawingNo: 'MT-7601', batchNo: 'B26070901', returnQty: '120', reason: '平面度超差', amount: '4776.00', responsibility: 'company', disposition: 'rework' },
+      { seq: 2, productName: '定位销座', drawingNo: 'MT-7420', batchNo: 'B26070902', returnQty: '30', reason: '镀锌层附着力不良', amount: '648.00', responsibility: 'supplier', disposition: 'refund' },
     ],
     orderNo: 'SO-20260620-0071',
     shipmentNo: 'SHP-20260702-0043',
     customerName: '苏州明泰自动化',
     productName: '导轨压板',
     batchNo: 'B26062204',
-    returnQty: '120',
-    reason: '孔位尺寸超差（+0.06mm）',
-    responsibility: 'company',
-    disposition: 'rework',
-    amount: { amount: '4776.00', currency: 'CNY' },
+    // 单头是两行的汇总：120 + 30
+    returnQty: '150',
+    reason: '孔位尺寸超差（+0.06mm）；镀锌层附着力不良',
+    // ⚠️ 责任与处置**逐行判定**，单头只是派生视图（见 sales-return.types 注释）。
+    // 两行责任不同（平面度超差是公司责任，镀锌层附着力是供应商责任），
+    // 按服务端 rollup 规则：全行一致才取该值，不一致回落 undecided 并置 mixed 标记。
+    // 原先直接写 company/rework，等于挑其中一行冒充全单。
+    responsibility: 'undecided',
+    disposition: 'undecided',
+    mixedResponsibility: true,
+    mixedDisposition: true,
+    amount: { amount: '5424.00', currency: 'CNY' },
     complaintAt: '2026-07-26 09:20',
     respondedAt: '2026-07-26 11:05',
     eightDNo: '8D-26-0031',
@@ -248,12 +257,13 @@ export const CUSTOMS_DOSSIERS: CustomsDossier[] = [
     status: 'draft',
     owner: '陈志强',
     documents: [
-      { templateCode: 'EXP-INV', name: '形式发票 Commercial Invoice', version: '—' },
+      { templateCode: 'EXP-PIN', name: '形式发票 Proforma Invoice', version: '—' },
+      { templateCode: 'EXP-INV', name: '商业发票 Commercial Invoice', version: '—' },
       { templateCode: 'EXP-PKL', name: '装箱单 Packing List', version: '—' },
       { templateCode: 'EXP-DEC', name: '报关单要素表', version: '—' },
       { templateCode: 'EXP-CON', name: '出口合同 Sales Contract', version: '—' },
     ],
-    missingFields: ['唛头 Shipping Marks', 'destination 港口代码'],
+    missingFields: ['目的港代码', '唛头 Shipping Marks'],
   },
   {
     id: 'CD2',
@@ -281,8 +291,14 @@ export const CUSTOMS_DOSSIERS: CustomsDossier[] = [
     checkedBy: '关务 · 吴敏',
     documents: [
       {
+        templateCode: 'EXP-PIN',
+        name: '形式发票 Proforma Invoice',
+        version: 'V1',
+        generatedAt: '2026-07-18 09:40',
+      },
+      {
         templateCode: 'EXP-INV',
-        name: '形式发票 Commercial Invoice',
+        name: '商业发票 Commercial Invoice',
         version: 'V2',
         generatedAt: '2026-07-21 14:20',
       },
@@ -331,9 +347,10 @@ export const CUSTOMS_DOSSIERS: CustomsDossier[] = [
     status: 'checking',
     owner: '罗晓琳',
     documents: [
+      { templateCode: 'EXP-PIN', name: '形式发票 Proforma Invoice', version: '—' },
       {
         templateCode: 'EXP-INV',
-        name: '形式发票 Commercial Invoice',
+        name: '商业发票 Commercial Invoice',
         version: 'V1',
         generatedAt: '2026-07-25 09:40',
       },
@@ -346,6 +363,9 @@ export const CUSTOMS_DOSSIERS: CustomsDossier[] = [
       { templateCode: 'EXP-DEC', name: '报关单要素表', version: '—' },
       { templateCode: 'EXP-CON', name: '出口合同 Sales Contract', version: '—' },
     ],
-    missingFields: ['模具寿命与所有权说明（香港代生产模具出境要求）'],
+    // `missingFields` 由服务端按 COMPLETENESS_MANIFEST 算出，值只能取自那张标签表。
+    // 原先写的「模具寿命与所有权说明」不在表里，任何服务端实现都产不出这个值。
+    // CD3 确实未填目的港代码与唛头，因此按真实判据给这两项。
+    missingFields: ['目的港代码', '唛头 Shipping Marks'],
   },
 ]

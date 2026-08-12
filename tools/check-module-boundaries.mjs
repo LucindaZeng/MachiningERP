@@ -4,7 +4,8 @@
  *
  * 校验项：
  *  1. 每个业务模块必须有唯一对外出口 index.ts 与 <name>.module.ts；
- *  2. 模块内目录只允许固定分层：controllers / services / repositories / dto / events / __tests__ / guards / mappers；
+ *  2. 模块内目录只允许固定分层：controllers / services / repositories / dto / events / __tests__ / guards / mappers /
+ *     constants / templates（templates 放模块自有的静态资产，如 docgen 的受控 .xlsx 模板）；
  *  3. 单个 controller 路由数 ≤ 8；
  *  4. controller 文件内不得出现业务分支密度过高的迹象（仅编解码）——以「不得直接 import PrismaService」表达；
  *  5. dto 目录一个文件只导出一个 DTO 类/接口。
@@ -30,6 +31,10 @@ const ALLOWED_DIRS = new Set([
   'mappers',
   'constants',
   '__tests__',
+  // 模块自有的静态资产（docgen 的受控 .xlsx 模板）。放在模块内而不是仓库级
+  // assets/：模板是 docgen 的一部分，跟着模块走才符合「一切功能模块化」。
+  // ⚠️ 非 .ts 资产不会被 tsc 带进 dist，需要 nest-cli.json 的 assets 规则复制。
+  'templates',
 ])
 
 const ROUTE_DECORATOR = /^\s*@(Get|Post|Put|Patch|Delete|All)\s*\(/gm

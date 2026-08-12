@@ -1,11 +1,13 @@
 import { request } from '../http'
 
-import type { CostReports } from '../mock/sales/analytics-cost.fixture'
-import type { MarketReports } from '../mock/sales/analytics-market.fixture'
-import type { OrderExtraReports } from '../mock/sales/analytics-order.fixture'
-import type { SalesReports } from '../mock/sales/analytics-reports.fixture'
-import type { SalesAnalytics } from '../mock/sales/analytics.fixture'
-import type { DailyOpsReport } from '../mock/sales/daily-ops.fixture'
+import type {
+  CostReports,
+  DailyOpsReport,
+  MarketReports,
+  OrderExtraReports,
+  SalesAnalytics,
+  SalesReports,
+} from '@machining-erp/shared'
 
 /** GET /sales/analytics —— 业务部经营分析看板（BI 指标口径见页面说明表） */
 export function fetchSalesAnalytics(): Promise<SalesAnalytics> {

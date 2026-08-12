@@ -3,7 +3,12 @@ import { Download, Lock, Refresh } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { computed, ref } from 'vue'
 
+import {
+  issueCostAnalysisDocument,
+  mergeExportCostAnalyses,
+} from '@/api/sales/docgen.api'
 import { useCostAnalysis } from '@/composables/use-cost-analysis'
+import { useDocumentExport } from '@/composables/use-document-export'
 import { usePermission } from '@/composables/use-permission'
 
 import { exportCostAnalyses } from './quote-export'
@@ -33,16 +38,36 @@ function refreshSnapshot(): void {
   ElMessage.success('已刷新行情并生成新的价格快照（快照含行情源、时间、币种、汇率与公式）')
 }
 
+const documentExport = useDocumentExport()
+
+/** 通用导出：把**当前这张表**另存为 Excel，客户端生成，不留生成记录。 */
 function exportCurrent(): void {
   if (current.value) {
     exportCostAnalyses([current.value], false)
   }
 }
 
-function exportMerged(): void {
-  if (mergeList.value.length) {
-    exportCostAnalyses(mergeList.value, mergeList.value.length > 1)
+/**
+ * 按 CNC 成本分析模板出具受控表。金额取后端算好的值，模板里已无公式——
+ * 两处各算一遍迟早对不上，而对不上的是给管理层看的成本数。
+ */
+async function issueCurrent(): Promise<void> {
+  const id = current.value?.id
+  if (!id) {
+    ElMessage.warning('本地演示数据没有成本分析主键，接上真实接口后可出具')
+    return
   }
+  await documentExport.issue(() => issueCostAnalysisDocument(id), '成本分析表')
+}
+
+/** 多选合并比较表：服务端受控模板，一行一条明细，可排序可筛选。 */
+async function exportMerged(): Promise<void> {
+  const ids = mergeList.value.map((item) => item.id).filter((id): id is string => Boolean(id))
+  if (!ids.length) {
+    ElMessage.warning('本地演示数据没有成本分析主键，接上真实接口后可合并出具')
+    return
+  }
+  await documentExport.issue(() => mergeExportCostAnalyses(ids), '成本分析合并比较表')
 }
 
 function saveVersion(): void {
@@ -89,8 +114,17 @@ function saveVersion(): void {
       >
         <el-option v-for="item in options" :key="item.value" v-bind="item" />
       </el-select>
-      <el-button :disabled="!mergeKeys.length" @click="exportMerged">
-        合并导出所选（{{ mergeKeys.length }}）
+      <el-button
+        type="primary"
+        plain
+        :disabled="!mergeKeys.length"
+        :loading="documentExport.issuing.value"
+        @click="exportMerged"
+      >
+        出具合并比较表（{{ mergeKeys.length }}）
+      </el-button>
+      <el-button :loading="documentExport.issuing.value" @click="issueCurrent">
+        出具成本分析表
       </el-button>
       <el-button :icon="Download" @click="exportCurrent">导出本表 Excel</el-button>
       <el-button type="primary" :disabled="!canEditCosting" @click="saveVersion">

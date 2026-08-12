@@ -32,6 +32,13 @@ export const PERMISSION_CODES = {
    * ——让登记人自己认定责任，等于让被投诉方给自己打分。
    */
   QUALITY_RMA_JUDGE: 'quality.rma.judge',
+  /**
+   * 关务岗：报关要素复核、申报与回执归档。
+   *
+   * 与业务权限分开的理由写在规格第 10 章里：「关务复核不可跳过」——
+   * 让建档的人自己复核，这道闸门就只是一次多余的点击。
+   */
+  CUSTOMS_DECLARE: 'customs.declare',
   /** 客户档案建档与常规字段维护 */
   CUSTOMER_EDIT: 'customer.edit',
   /** 客户档案敏感字段（银行账号、付款条件等）变更的审批权 */

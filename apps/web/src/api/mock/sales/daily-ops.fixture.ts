@@ -1,33 +1,19 @@
 /**
+ * 类型已迁到 `@machining-erp/shared`（development-guide §1：packages/shared 承载前后端共享契约）。
+ * 本文件只保留 **mock 数据**——真实接口未接通时的回落数据源，形状由 shared 保证与后端一致。
+ */
+import type {
+  DailyOpsReport,
+} from '@machining-erp/shared'
+
+
+/**
  * 每日经营量：接单 / 出货 / 未完成订单。
  * 口径：
  * - 接单量 = 当日业务经理审核通过（ORD-02）的订单，按张数、件数与合同金额统计；备料订单件数计入、金额按预计生产成本计；
  * - 出货量 = 当日实际发货（SHP-04 出货）的发货单，按张数、件数与出货金额统计；
  * - 未完成订单 = 截至当日日终，已评审通过但尚未全部出货的订单存量（张数与未交件数），是存量指标而非当日发生额。
  */
-
-export interface DailyOpsRow {
-  date: string
-  /** 当日接单 */
-  receivedOrders: number
-  receivedQty: number
-  receivedAmount: number
-  /** 当日出货 */
-  shippedOrders: number
-  shippedQty: number
-  shippedAmount: number
-  /** 日终未完成订单存量 */
-  openOrders: number
-  openQty: number
-  openAmount: number
-}
-
-export interface DailyOpsReport {
-  rows: DailyOpsRow[]
-  /** 统计区间说明与数据截止 */
-  caliber: string
-  updatedAt: string
-}
 
 /** 近 30 天（2026-06-29 ~ 2026-07-28） */
 export const DAILY_OPS: DailyOpsReport = {

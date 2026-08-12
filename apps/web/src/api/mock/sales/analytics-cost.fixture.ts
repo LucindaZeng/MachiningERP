@@ -1,84 +1,18 @@
 /**
+ * 类型已迁到 `@machining-erp/shared`（development-guide §1：packages/shared 承载前后端共享契约）。
+ * 本文件只保留 **mock 数据**——真实接口未接通时的回落数据源，形状由 shared 保证与后端一致。
+ */
+import type {
+  CostReports,
+} from '@machining-erp/shared'
+
+
+/**
  * 报价成本偏差分析 + 成本参考值反馈 + 审核时效（含备料订单总经办审批时效）。
  * 偏差口径：实际成本取生产订单工序报工 / 领料 / 委外对账，报价成本取核价单同工序预估值；
  * 领用备料的订单一律按加权平均成本口径参与偏差计算。
  */
 
-export type CostElement = '材料' | '加工时间' | '工艺'
-export type VarianceLevel = 'ok' | 'watch' | 'alert'
-
-export interface ElementVarianceRow {
-  element: CostElement
-  quoted: number
-  actual: number
-  gapRate: number
-  orders: number
-  share: number
-  mainReason: string
-}
-
-export interface CostDrillRow {
-  dimension: '产品' | '材质' | '报价工程师'
-  name: string
-  orders: number
-  materialGap: number
-  timeGap: number
-  processGap: number
-  totalGap: number
-  level: VarianceLevel
-  action: string
-}
-
-export interface OperationVarianceRow {
-  operation: string
-  element: CostElement
-  orders: number
-  quoted: number
-  actual: number
-  gapRate: number
-  reason: string
-}
-
-export interface CostRefRow {
-  item: string
-  scope: string
-  current: string
-  suggested: string
-  basis: string
-  status: '待确认' | '已采纳' | '已驳回'
-}
-
-export interface SlaNodeRow {
-  doc: string
-  node: string
-  owner: string
-  avgHours: number
-  p90Hours: number
-  slaHours: number
-  overdueRate: number
-}
-
-export interface StockApprovalRow {
-  docNo: string
-  productName: string
-  qty: number
-  amount: number
-  submittedAt: string
-  approvedAt: string
-  hours: number
-  slaHours: number
-  approver: string
-}
-
-export interface CostReports {
-  elementVariance: ElementVarianceRow[]
-  drill: CostDrillRow[]
-  operationVariance: OperationVarianceRow[]
-  costRef: CostRefRow[]
-  slaNodes: SlaNodeRow[]
-  stockApproval: StockApprovalRow[]
-  threshold: { warn: number; alert: number; note: string }
-}
 
 export const COST_REPORTS: CostReports = {
   threshold: {

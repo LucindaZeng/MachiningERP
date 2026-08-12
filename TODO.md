@@ -20,6 +20,7 @@
 - [ ] 上线前必办：出货模块 QC 放行读端口当前为"默认放行"stub（仅告警日志）——QMS 模块接入后必须切换为真实检验结论，否则出货不经品质把关
 - [ ] 上线前复核：对账单的开票/退货列在 invoice-request、sales-return 模块落地后接真实源单并复核口径（当前源为空返回 0）
 - [ ] drawing-upload 任务（file-preview 后立即执行）：报价图纸与订单PO的真实上传——当前"强制传图纸"仅在前端mock层，后端从未写入对象存储
+- [ ] 报价单中英文 PDF 正式输出（规格§2.4）：有意延后——路线已定为「同一份填充后的 xlsx 经 LibreOffice-headless 边车转 PDF」，挂 DocumentRenderer 端口（即 doc-render 抽取目标）；过渡期用 kkFileView 预览 + 浏览器打印
 - [ ] 架构决策点：当出现第三种需预览/管理的文件类型（质量文件、报关单证、发票扫描件）时，把文件存储迁移到统一 FileObject 表（file-preview 的 resolver registry 接口保持不变）
 - [ ] 修正 fulfilment.fixture 演示数据：多行出货的表头数量应为行合计（当前取首行，与真实 API 聚合口径不一致）
 - [x] 开发文档、接口规范、接口文档、开发进度表

@@ -33,6 +33,12 @@ export interface SimilarProduct {
 }
 
 export interface CostAnalysis {
+  /**
+   * 成本分析主键。服务端 `CostAnalysisView` 一直有下发，只是本地固件里没有；
+   * 出具受控成本分析表与合并比较表要按 id 调服务端，因此在契约上补齐。
+   * 可选是为了让固件不必逐条编 uuid。
+   */
+  id?: string
   quotationNo: string
   productName: string
   drawingNo: string

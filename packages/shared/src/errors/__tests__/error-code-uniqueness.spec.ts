@@ -1,6 +1,7 @@
 import { AUTH_ERRORS } from '../auth-error-codes'
 import { BOM_ERRORS } from '../bom-error-codes'
 import { CUSTOMER_ERRORS } from '../customer-error-codes'
+import { CUSTOMS_ERRORS } from '../customs-error-codes'
 import { ERROR_SEGMENTS } from '../error-segment'
 import { FILE_PREVIEW_ERRORS } from '../file-preview-error-codes'
 import { INVOICE_ERRORS } from '../invoice-error-codes'
@@ -23,6 +24,7 @@ import type { BizErrorDefinition } from '../error-segment'
 const ALL_DICTIONARIES: ReadonlyArray<[string, Record<string, BizErrorDefinition>]> = [
   ['AUTH_ERRORS', AUTH_ERRORS],
   ['CUSTOMER_ERRORS', CUSTOMER_ERRORS],
+  ['CUSTOMS_ERRORS', CUSTOMS_ERRORS],
   ['QUOTATION_ERRORS', QUOTATION_ERRORS],
   ['ORDER_ERRORS', ORDER_ERRORS],
   ['BOM_ERRORS', BOM_ERRORS],

@@ -5,56 +5,9 @@
  * 这里保留再导出，历史的 `@/api/mock/sales/analytics-reports.fixture` 引用无需改动。
  */
 import type {
-  ArAgingRow,
-  BacklogRow,
-  CostVarianceRow,
-  CustomerActivityRow,
-  CustomerMarginRow,
-  CustomerRankRow,
-  FunnelRow,
-  InvoiceReceivableRow,
-  LateReason,
-  LostReason,
-  MixRow,
-  NewCustomerRow,
-  OnTimeRow,
-  OrderMixRow,
-  OrderTrendRow,
-  PriceTrendRow,
-  ProductMarginRow,
-  QuoteByDim,
-  QuoteCycleRow,
-  RepeatIssueRow,
-  RmaStatRow,
   SalesReports,
-  ShipmentAchieveRow,
 } from '@/types/sales/analytics-report.types'
 
-export type {
-  ArAgingRow,
-  BacklogRow,
-  CostVarianceRow,
-  CustomerActivityRow,
-  CustomerMarginRow,
-  CustomerRankRow,
-  FunnelRow,
-  InvoiceReceivableRow,
-  LateReason,
-  LostReason,
-  MixRow,
-  NewCustomerRow,
-  OnTimeRow,
-  OrderMixRow,
-  OrderTrendRow,
-  PriceTrendRow,
-  ProductMarginRow,
-  QuoteByDim,
-  QuoteCycleRow,
-  RepeatIssueRow,
-  RmaStatRow,
-  SalesReports,
-  ShipmentAchieveRow,
-}
 
 export const SALES_REPORTS: SalesReports = {
   quoteFunnel: [

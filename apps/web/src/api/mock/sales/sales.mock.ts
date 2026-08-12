@@ -7,8 +7,11 @@ import { SALES_REPORTS } from './analytics-reports.fixture'
 import { SALES_ANALYTICS } from './analytics.fixture'
 import { BOM_REQUESTS } from './bom-request.fixture'
 import { CUSTOMERS } from './customer.fixture'
+import { CUSTOMS_ROUTES } from './customs.mock'
 import { DAILY_OPS } from './daily-ops.fixture'
+import { DOCGEN_ROUTES } from './docgen.mock'
 import { ENGINEERING_CHANGES } from './ecn.fixture'
+import { ECN_ROUTES } from './ecn.mock'
 import { CUSTOMS_DOSSIERS, SALES_RETURNS, SHIPMENTS } from './fulfilment.fixture'
 import { HISTORICAL_QUOTES } from './historical-quote.fixture'
 import { INVOICE_REQUESTS } from './invoice.fixture'
@@ -141,6 +144,9 @@ const PARAM_ROUTES: Array<{ path: string; handle: (params: string[], body: unkno
       patchInvoice(id, { status: 'void', voidReason: (body as { reason?: string })?.reason }),
   },
   ...SALES_RETURN_ROUTES,
+  ...CUSTOMS_ROUTES,
+  ...DOCGEN_ROUTES,
+  ...ECN_ROUTES,
   { path: 'GET /statements/:id', handle: ([id]) => findStatement(id) },
   { path: 'POST /statements/:id/send', handle: ([id]) => sendStatement(id) },
   { path: 'POST /statements/:id/confirm', handle: ([id]) => patchStatement(id, { status: 'confirmed' }) },

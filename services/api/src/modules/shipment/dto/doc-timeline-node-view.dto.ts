@@ -1,13 +1,6 @@
 /**
- * 节点计时的对外形状，对齐前端 `TimelineNode`。
- * 耗时由平台 timeline 服务算好，这里只做单位换算（毫秒 → 小时）。
+ * 节点计时的对外形状。**实现已提到 platform/timeline**——
+ * 出货、销退、报关三处曾各抄一份逐字相同的铺法。这里只做再导出，
+ * 既有 `from '../../shipment'` 的引用路径因此不变。
  */
-export interface DocTimelineNodeView {
-  node: string
-  owner: string
-  state: 'done' | 'active' | 'pending' | 'overdue'
-  enteredAt?: string
-  finishedAt?: string
-  elapsedHours?: number
-  remark?: string
-}
+export type { DocTimelineNodeView } from '../../../platform/timeline'

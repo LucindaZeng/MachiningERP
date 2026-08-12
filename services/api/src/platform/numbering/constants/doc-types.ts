@@ -21,7 +21,8 @@ export const DOC_TYPES = {
   SHIPMENT: 'SHP',
   SALES_RETURN: 'RMA',
   INVOICE_REQUEST: 'INV',
-  CUSTOMS_DOSSIER: 'CUD',
+  /** 报关资料：前缀取 EXP（出口），与前端 fixture 与页面的 EXP-01~04 一致 */
+  CUSTOMS_DOSSIER: 'EXP',
   STATEMENT: 'STM',
   /** 用户唯一编码：终身不变、永不复用，因此按年重置但带年份段隔离 */
   USER_CODE: 'USER_CODE',

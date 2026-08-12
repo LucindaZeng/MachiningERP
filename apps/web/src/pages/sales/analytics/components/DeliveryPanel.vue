@@ -3,7 +3,7 @@ import { computed } from 'vue'
 
 import ReportCard from './ReportCard.vue'
 
-import type { SalesReports } from '@/api/mock/sales/analytics-reports.fixture'
+import type { SalesReports } from '@machining-erp/shared'
 
 const props = defineProps<{ reports: SalesReports }>()
 
