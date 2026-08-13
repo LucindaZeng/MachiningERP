@@ -31,7 +31,6 @@ REQUIRED = [
     "docs/制造业ERP软件规划方案_V2.1.docx",
     "docs/制造业ERP软件规划方案_V2.2.docx",
     "docs/制造业ERP软件规划方案_V2.3.docx",
-    "docs/制造业ERP软件规划方案_V2.4.docx",
     "docs/workflows/tail-quantity-rework.md",
     "docs/features/aged-work-order-monitoring.md",
     "docs/features/machine-loading-plan.md",
@@ -62,6 +61,10 @@ REQUIRED = [
 ]
 
 MARKDOWN_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+BASELINE_FILE = Path("packages/shared/src/baseline.ts")
+BASELINE_CONST = re.compile(
+    r"REQUIREMENTS_BASELINE_VERSION\s*=\s*['\"]([^'\"]+)['\"]"
+)
 LOCAL_ABSOLUTE = re.compile(r"(?:/Users/|[A-Za-z]:\\\\)")
 
 
@@ -117,11 +120,12 @@ def check_issue_forms(errors: list[str]) -> None:
             errors.append(f"duplicate field id in {path.relative_to(ROOT)}")
 
 
-def check_planning_document(errors: list[str]) -> None:
+def check_planning_document(version: str | None, errors: list[str]) -> None:
     builder = ROOT / "tools" / "build_erp_plan.py"
     if builder.exists() and 'DOC_VERSION = "V2.1"' not in builder.read_text(encoding="utf-8"):
         errors.append("tools/build_erp_plan.py is not configured for V2.1")
-    docx = ROOT / "docs" / "制造业ERP软件规划方案_V2.4.docx"
+    # 完整性校验对准**当前基线**那一版，而不是某个写死的历史版本
+    docx = ROOT / "docs" / f"制造业ERP软件规划方案_{version or 'V2.3'}.docx"
     if docx.exists():
         try:
             with zipfile.ZipFile(docx) as archive:
@@ -131,7 +135,58 @@ def check_planning_document(errors: list[str]) -> None:
                 if "word/document.xml" not in archive.namelist():
                     errors.append("DOCX is missing word/document.xml")
         except zipfile.BadZipFile:
-            errors.append("V2.4 planning document is not a valid DOCX ZIP")
+            errors.append(f"{docx.name} 不是有效的 DOCX ZIP 包")
+
+
+def read_baseline_version(errors: list[str]) -> str | None:
+    """读出需求基线版本号的唯一事实源。
+
+    用正则而不是执行 TypeScript：这个脚本只依赖 Python 标准库，
+    为了读一个常量把 node/tsc 拉进来，代价远大于收益。
+    """
+    source = ROOT / BASELINE_FILE
+    if not source.exists():
+        errors.append(
+            f"需求基线版本号的唯一事实源不存在：{BASELINE_FILE}"
+            "（登录页角标与本检查都从它取值）"
+        )
+        return None
+
+    matched = BASELINE_CONST.search(source.read_text(encoding="utf-8"))
+    if not matched:
+        errors.append(
+            f"在 {BASELINE_FILE} 中找不到 REQUIREMENTS_BASELINE_VERSION 常量；"
+            "它是登录页角标与规划方案校验的共同来源，不能删除或改名"
+        )
+        return None
+
+    return matched.group(1)
+
+
+def check_baseline_version(version: str | None, errors: list[str]) -> None:
+    """常量与 Word 方案必须对得上。
+
+    单靠一个常量挡不住漂移——它照样可以被改成一个并不存在的版本。
+    真正的约束是这一条：**常量指向哪一版，仓库里就必须有哪一版的 Word 方案**，
+    两边任意一侧单独动，仓库检查就是红的。
+    """
+    if version is None:
+        return
+
+    expected = ROOT / "docs" / f"制造业ERP软件规划方案_{version}.docx"
+    if expected.exists():
+        return
+
+    available = sorted(
+        path.name for path in (ROOT / "docs").glob("制造业ERP软件规划方案_*.docx")
+    )
+    errors.append(
+        f"需求基线常量为 {version}，但缺少对应的规划方案 "
+        f"docs/{expected.name}。"
+        f"现有版本：{'、'.join(available) if available else '（一份都没有）'}。"
+        f"请补齐该版 Word 方案，或把 {BASELINE_FILE} 里的 "
+        "REQUIREMENTS_BASELINE_VERSION 改回实际版本"
+    )
 
 
 def check_prohibited_files(files: list[Path], errors: list[str]) -> None:
@@ -148,10 +203,12 @@ def check_prohibited_files(files: list[Path], errors: list[str]) -> None:
 def main() -> int:
     errors: list[str] = []
     files = repository_files()
+    baseline_version = read_baseline_version(errors)
     check_required(errors)
     check_markdown_links(files, errors)
     check_issue_forms(errors)
-    check_planning_document(errors)
+    check_baseline_version(baseline_version, errors)
+    check_planning_document(baseline_version, errors)
     check_prohibited_files(files, errors)
 
     if errors:

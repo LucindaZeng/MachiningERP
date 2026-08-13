@@ -1,5 +1,7 @@
 /** @machining-erp/shared —— 前后端共享契约的唯一出口。 */
 
+export * from './baseline'
+
 export * from './money/currency'
 export * from './money/money'
 export * from './money/money-codec'

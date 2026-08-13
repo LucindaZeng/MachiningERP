@@ -1,4 +1,7 @@
 <script setup lang="ts">
+// 角标版本号来自共享常量，不在这里写字面量——它已经跟着 Word 方案漂过两次
+import { REQUIREMENTS_BASELINE_LABEL } from '@machining-erp/shared'
+
 const highlights = [
   { title: '报价 · 订单 · 计划 · 采购', desc: '询价核价到合同评审全链路，节点耗时可量化' },
   { title: '一码到底 MES', desc: '扫码报工、工序防跳、跨工序返工与批次追溯' },
@@ -27,7 +30,7 @@ const highlights = [
     </div>
 
     <footer class="brand-panel__foot">
-      <span>需求基线 V2.1</span>
+      <span>{{ REQUIREMENTS_BASELINE_LABEL }}</span>
       <span class="brand-panel__dot">·</span>
       <span>私有化部署</span>
       <span class="brand-panel__dot">·</span>
