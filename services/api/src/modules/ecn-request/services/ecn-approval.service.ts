@@ -14,6 +14,7 @@ import {
 } from '../repositories/ecn.repository.port'
 
 import { EcnImpactService } from './ecn-impact.service'
+import { assertClosable } from './ecn-production.rules'
 import { EcnRequestService, type EcnActor } from './ecn-request.service'
 import { assertRejectReason, assertReleasable } from './ecn-scope.rules'
 
@@ -156,9 +157,21 @@ export class EcnApprovalService {
     return this.requests.advance({ ...current, versionLock }, 'EXECUTING', actor, {})
   }
 
+  /**
+   * 结案。
+   *
+   * 「对生产有影响」的变更必须先由 PMC 录完数量、且返工已发起才能结案；
+   * **「无影响」的两步都跳过**——它本来就没有已投产的东西要处理。
+   */
   async close(id: string, versionLock: number, actor: EcnActor): Promise<EcnRequestRecord> {
     EcnImpactService.assertEngineer(actor)
     const current = await this.requests.load(id)
+
+    assertClosable({
+      productionImpact: current.productionImpact,
+      affectedLineCount: current.affectedLines.length,
+      reworkInitiatedAt: current.reworkInitiatedAt,
+    })
 
     const closed = await this.requests.advance({ ...current, versionLock }, 'CLOSED', actor, {
       closedAt: new Date(),

@@ -14,6 +14,26 @@ export {
   type ImpactInput,
 } from './services/ecn-impact.service'
 export { EcnApprovalService, assertSignoffComplete } from './services/ecn-approval.service'
+export {
+  EcnProductionService,
+  totalAffectedQty,
+  type AffectedLineInput,
+} from './services/ecn-production.service'
+export {
+  assertClosable,
+  assertProductionImpactClassified,
+  assertQuantityEntryEditable,
+  assertReworkInitiable,
+} from './services/ecn-production.rules'
+export {
+  AFFECTED_QTY_RULE,
+  ECN_PRODUCTION_IMPACTS,
+  ECN_PRODUCTION_IMPACT_LABEL,
+  PRODUCTION_IMPACT_FROM_WIRE,
+  PRODUCTION_IMPACT_TO_WIRE,
+  isEcnProductionImpact,
+  requiresProductionCount,
+} from './constants/ecn-production-impact'
 export { EcnReadService } from './services/ecn-read.service'
 export { EcnRequestFacade } from './services/ecn-request.facade'
 export { EcnContextService, type EcnLinkageView } from './services/ecn-context.service'
@@ -67,9 +87,12 @@ export { toEcnRequestView, type EcnNaming } from './services/ecn-view.mapper'
 export type { EcnRequestView } from './dto/ecn-view.dto'
 export type { EcnImpactView } from './dto/ecn-impact-view.dto'
 export type { EcnSignoffView } from './dto/ecn-signoff-view.dto'
+export type { EcnAffectedLineView } from './dto/ecn-affected-line-view.dto'
 export {
   ECN_REPOSITORY,
   type CreateEcnRequestData,
+  type EcnAffectedLineDraft,
+  type EcnAffectedLineRecord,
   type EcnImpactDraft,
   type EcnImpactRecord,
   type EcnQuery,

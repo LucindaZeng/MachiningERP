@@ -90,6 +90,49 @@ export const ECN_ERRORS = {
     status: 422,
     message: '跨部门会签尚未完成，不能批准',
   },
+
+  /* ---------- 生产影响分类（规格第 6 章新增规则） ---------- */
+
+  /**
+   * 未分类就想往下走。这是本轮新规则的核心闸门：
+   * 「对生产有没有影响」决定了后面要不要清点已投产数量、要不要走返工，
+   * 不填等于把这两件事一起跳过。
+   */
+  PRODUCTION_IMPACT_REQUIRED: {
+    code: 'ORD_3013',
+    status: 422,
+    message: '请先判定本次变更对生产有无影响（无影响 / 有影响）再送会签',
+  },
+  /** 已投产数量由 PMC 清点录入——业务与工程都不该替生产报这个数 */
+  PMC_ROLE_REQUIRED: {
+    code: 'ORD_3014',
+    status: 403,
+    message: '已投产数量的清点与录入需要 PMC 权限',
+  },
+  /**
+   * 返工已发起后数量锁死。理由：返工工单是按这个数拆的，
+   * 事后再改数量，车间手上的工单与系统里的数就对不上了。
+   */
+  AFFECTED_QTY_LOCKED: {
+    code: 'ORD_3015',
+    status: 409,
+    message: '返工已发起，受影响数量不可再修改；如需调整请另开变更单',
+  },
+  AFFECTED_QTY_REQUIRED: {
+    code: 'ORD_3016',
+    status: 422,
+    message: '对生产有影响的变更必须先由 PMC 录入受影响数量',
+  },
+  REWORK_NOT_INITIATED: {
+    code: 'ORD_3017',
+    status: 422,
+    message: '对生产有影响的变更必须先发起返工才能结案',
+  },
+  REWORK_ALREADY_INITIATED: {
+    code: 'ORD_3018',
+    status: 409,
+    message: '返工已发起，不可重复发起',
+  },
 } as const satisfies Record<string, BizErrorDefinition>
 
 export type EcnErrorKey = keyof typeof ECN_ERRORS

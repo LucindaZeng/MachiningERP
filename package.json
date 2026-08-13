@@ -21,21 +21,11 @@
     "test:cov": "pnpm -r test:cov",
     "db:up": "docker compose -f infra/docker-compose.dev.yml up -d",
     "db:down": "docker compose -f infra/docker-compose.dev.yml down",
+    "stack:up": "docker compose -f infra/docker-compose.local.yml up -d",
+    "stack:down": "docker compose -f infra/docker-compose.local.yml down",
     "db:migrate": "pnpm -F @machining-erp/api prisma:migrate",
     "db:seed": "pnpm -F @machining-erp/api prisma:seed",
     "check:repo": "python3 tools/check_repository.py"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@nestjs/core",
-      "@prisma/client",
-      "@prisma/engines",
-      "@swc/core",
-      "esbuild",
-      "prisma",
-      "unrs-resolver",
-      "vue-demi"
-    ]
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",

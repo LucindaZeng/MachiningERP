@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 
+
 import DocTimeline from '@/components/DocTimeline.vue'
 import { ECN_CHANGE_TYPE } from '@/components/status-dictionary'
 
 import type { EngineeringChange } from '@/types/sales.types'
+
 
 const props = defineProps<{
   modelValue: boolean
@@ -23,6 +25,8 @@ const emit = defineEmits<{
   reject: []
   execute: []
   close: []
+  'enter-qty': []
+  'initiate-rework': []
 }>()
 
 /**
@@ -30,6 +34,20 @@ const emit = defineEmits<{
  * 点下去后端还会再判一次（改图未同步工艺路线、四项影响没评全等）。
  */
 const status = computed(() => props.change?.status ?? 'draft')
+
+/** 判为「有影响」——后面的清点与返工两步都由它决定要不要出现。 */
+const impacted = computed(() => props.change?.productionImpact === 'impacted')
+
+/** 返工已发起：数量锁死，录入入口收起来，避免点进去吃一个 409。 */
+const reworkStarted = computed(() => Boolean(props.change?.reworkInitiatedAt))
+
+const affectedLines = computed(() => props.change?.affectedLines ?? [])
+
+/**
+ * 清点与返工只在**批准之后**才有意义：批准前变更还可能被驳回，
+ * 这时候让 PMC 去清点等于让人白跑一趟车间。
+ */
+const productionStage = computed(() => ['approved', 'executing'].includes(status.value))
 
 const visible = computed({
   get: () => props.modelValue,
@@ -89,6 +107,14 @@ const visible = computed({
       </el-table>
 
       <div class="consequence">
+        <el-tag
+          v-if="change.productionImpact"
+          :type="impacted ? 'danger' : 'success'"
+          effect="light"
+        >
+          {{ impacted ? '对生产有影响' : '对生产无影响' }}
+        </el-tag>
+        <el-tag v-else type="warning" effect="light">生产影响未判定</el-tag>
         <el-tag :type="change.needRequote ? 'warning' : 'info'" effect="light">
           {{ change.needRequote ? '触发重新核价' : '不影响价格' }}
         </el-tag>
@@ -99,6 +125,32 @@ const visible = computed({
           {{ change.routingUpdated ? '工艺路线已同步' : '工艺路线未同步' }}
         </el-tag>
       </div>
+
+      <template v-if="impacted">
+        <h3 class="drawer-title">
+          受影响数量（PMC 清点）
+          <span class="rule">口径：只要生产（车床/CNC）动了就计入，尚未上机的料不计</span>
+        </h3>
+        <el-table v-if="affectedLines.length" :data="affectedLines" size="small" border>
+          <el-table-column prop="productName" label="产品" min-width="180" />
+          <el-table-column prop="drawingNo" label="图号" width="130" />
+          <el-table-column prop="affectedQty" label="已投产数量" width="110" align="right" />
+          <el-table-column prop="note" label="备注" min-width="160" />
+          <el-table-column prop="enteredBy" label="录入人" width="120" />
+          <el-table-column prop="enteredAt" label="录入时间" width="140" />
+        </el-table>
+        <el-alert
+          v-else
+          type="info"
+          :closable="false"
+          show-icon
+          title="尚未清点"
+          description="判为「对生产有影响」的变更，必须先由 PMC 清点录入已投产数量并发起返工，才允许结案。"
+        />
+        <p v-if="change.reworkInitiatedAt" class="locked">
+          返工已于 {{ change.reworkInitiatedAt }} 发起，受影响数量已锁死；如需调整请另开一张变更单。
+        </p>
+      </template>
 
       <DocTimeline class="drawer-timeline" title="变更处理节点计时" :nodes="change.timeline" />
     </template>
@@ -124,6 +176,22 @@ const visible = computed({
         <el-button v-if="status === 'approved'" type="primary" :loading="busy" @click="emit('execute')">
           转入执行
         </el-button>
+        <!-- PMC 侧：清点与返工。批准之后才出现，返工发起后录入入口即收起 -->
+        <template v-if="impacted && productionStage">
+          <el-button v-if="!reworkStarted" :loading="busy" @click="emit('enter-qty')">
+            录入受影响数量
+          </el-button>
+          <el-button
+            v-if="!reworkStarted"
+            type="warning"
+            plain
+            :loading="busy"
+            :disabled="affectedLines.length === 0"
+            @click="emit('initiate-rework')"
+          >
+            发起返工
+          </el-button>
+        </template>
         <el-button v-if="status === 'executing'" type="primary" :loading="busy" @click="emit('close')">
           结案
         </el-button>
@@ -183,6 +251,19 @@ const visible = computed({
   display: flex;
   gap: 10px;
   margin-top: 16px;
+}
+
+.rule {
+  margin-left: 10px;
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--wfx-text-muted);
+}
+
+.locked {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--el-color-warning);
 }
 
 .drawer-alert,

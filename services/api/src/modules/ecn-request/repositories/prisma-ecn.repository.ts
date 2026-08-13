@@ -5,6 +5,7 @@ import { ECN_IMPACT_SCOPE_ORDER } from '../constants/ecn-impact-scopes'
 
 import type {
   CreateEcnRequestData,
+  EcnAffectedLineDraft,
   EcnImpactDraft,
   EcnQuery,
   EcnRepositoryPort,
@@ -12,13 +13,21 @@ import type {
   EcnRequestRecord,
   EcnSignoffRecord,
 } from './ecn.repository.port'
-import type { EcnImpact, EcnRequest, EcnSignoff } from '@prisma/client'
+import type { EcnAffectedLine, EcnImpact, EcnRequest, EcnSignoff } from '@prisma/client'
 
 const DEFAULT_LIMIT = 100
 
-type EcnRow = EcnRequest & { impacts: EcnImpact[]; signoffs: EcnSignoff[] }
+type EcnRow = EcnRequest & {
+  impacts: EcnImpact[]
+  signoffs: EcnSignoff[]
+  affectedLines: EcnAffectedLine[]
+}
 
-const WITH_ALL = { impacts: true, signoffs: { orderBy: { department: 'asc' as const } } }
+const WITH_ALL = {
+  impacts: true,
+  signoffs: { orderBy: { department: 'asc' as const } },
+  affectedLines: { orderBy: { productName: 'asc' as const } },
+}
 
 /** 薄适配器：只做数据访问，不含任何业务规则。 */
 @Injectable()
@@ -81,6 +90,29 @@ export class PrismaEcnRepository implements EcnRepositoryPort {
       await tx.ecnImpact.deleteMany({ where: { ecnId: id } })
       await tx.ecnImpact.createMany({
         data: impacts.map((impact) => ({ ...impact, ecnId: id })),
+      })
+      return true
+    })
+
+    return updated ? this.findById(id) : null
+  }
+
+  async replaceAffectedLines(
+    id: string,
+    versionLock: number,
+    lines: readonly EcnAffectedLineDraft[],
+    updatedBy: string,
+  ): Promise<EcnRequestRecord | null> {
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.ecnRequest.updateMany({
+        where: { id, versionLock },
+        data: { updatedBy, versionLock: { increment: 1 } },
+      })
+      if (count === 0) return false
+
+      await tx.ecnAffectedLine.deleteMany({ where: { ecnId: id } })
+      await tx.ecnAffectedLine.createMany({
+        data: lines.map((line) => ({ ...line, ecnId: id })),
       })
       return true
     })
@@ -151,24 +183,49 @@ function toRecord(row: EcnRow): EcnRequestRecord {
     approvedAt: row.approvedAt,
     closedAt: row.closedAt,
     rejectReason: row.rejectReason,
-    // 展示顺序即评估顺序：在制 → 已采购 → 已完工 → 已发货
-    impacts: [...row.impacts]
-      .sort((left, right) => ECN_IMPACT_SCOPE_ORDER[left.scope] - ECN_IMPACT_SCOPE_ORDER[right.scope])
-      .map((impact) => ({
-        id: impact.id,
-        scope: impact.scope,
-        quantity: impact.quantity,
-        amountMinor: impact.amountMinor,
-        note: impact.note,
-      })),
-    signoffs: row.signoffs.map((signoff) => ({
-      id: signoff.id,
-      department: signoff.department,
-      signedBy: signoff.signedBy,
-      signedAt: signoff.signedAt,
-      opinion: signoff.opinion,
-      proxied: signoff.proxied,
-    })),
+    productionImpact: row.productionImpact,
+    reworkInitiatedAt: row.reworkInitiatedAt,
+    reworkInitiatedBy: row.reworkInitiatedBy,
+    impacts: toImpacts(row.impacts),
+    affectedLines: row.affectedLines.map(toAffectedLine),
+    signoffs: row.signoffs.map(toSignoff),
     versionLock: row.versionLock,
+  }
+}
+
+/** 展示顺序即评估顺序：在制 → 已采购 → 已完工 → 已发货。 */
+function toImpacts(impacts: EcnImpact[]): EcnRequestRecord['impacts'] {
+  return [...impacts]
+    .sort((left, right) => ECN_IMPACT_SCOPE_ORDER[left.scope] - ECN_IMPACT_SCOPE_ORDER[right.scope])
+    .map((impact) => ({
+      id: impact.id,
+      scope: impact.scope,
+      quantity: impact.quantity,
+      amountMinor: impact.amountMinor,
+      note: impact.note,
+    }))
+}
+
+function toAffectedLine(line: EcnAffectedLine): EcnRequestRecord['affectedLines'][number] {
+  return {
+    id: line.id,
+    productName: line.productName,
+    drawingNo: line.drawingNo,
+    // Decimal → 定点字符串；金额与数量都不经过浮点
+    affectedQty: line.affectedQty.toString(),
+    note: line.note,
+    enteredBy: line.enteredBy,
+    enteredAt: line.enteredAt,
+  }
+}
+
+function toSignoff(signoff: EcnSignoff): EcnSignoffRecord {
+  return {
+    id: signoff.id,
+    department: signoff.department,
+    signedBy: signoff.signedBy,
+    signedAt: signoff.signedAt,
+    opinion: signoff.opinion,
+    proxied: signoff.proxied,
   }
 }

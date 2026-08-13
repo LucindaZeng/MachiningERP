@@ -143,10 +143,98 @@ function createChange(body: unknown): EngineeringChange {
   return record
 }
 
+/**
+ * 生产影响分类闸门（规格第 6 章新增规则）。未判定不许送会签——
+ * 分类决定了后面要不要清点、要不要返工，不填等于把两步一起跳过。
+ */
+function assertProductionImpactClassified(record: EngineeringChange): void {
+  if (record.productionImpact) return
+  throw new BizError({
+    code: 'ORD_3013',
+    status: 422,
+    message: '请先判定本次变更对生产有无影响（无影响 / 有影响）再送会签',
+  })
+}
+
+/** 结案闸门：「有影响」必须清点完并已发起返工；「无影响」两步都跳过。 */
+function assertClosable(record: EngineeringChange): void {
+  if (record.productionImpact !== 'impacted') return
+
+  if (!record.affectedLines?.length) {
+    throw new BizError({
+      code: 'ORD_3016',
+      status: 422,
+      message: '对生产有影响的变更必须先由 PMC 录入受影响数量',
+    })
+  }
+  if (!record.reworkInitiatedAt) {
+    throw new BizError({
+      code: 'ORD_3017',
+      status: 422,
+      message: '对生产有影响的变更必须先发起返工才能结案',
+    })
+  }
+}
+
+/** 本地清点录入。返工一经发起即锁死，与后端 assertQuantityEntryEditable 同一条规则。 */
+function enterQuantities(id: string | undefined, body: unknown): EngineeringChange {
+  const record = findChange(id)
+  if (record.reworkInitiatedAt) {
+    throw new BizError({
+      code: 'ORD_3015',
+      status: 409,
+      message: '返工已发起，受影响数量不可再修改；如需调整请另开变更单',
+    })
+  }
+
+  const input = (body ?? {}) as {
+    lines?: Array<{ productName: string; drawingNo: string; affectedQty: string; note?: string | null }>
+  }
+  const now = new Date().toISOString().slice(0, 16).replace('T', ' ')
+
+  return patchChange(id, {
+    affectedLines: (input.lines ?? []).map((line) => ({
+      productName: line.productName,
+      drawingNo: line.drawingNo,
+      affectedQty: line.affectedQty,
+      note: line.note ?? null,
+      enteredBy: 'PMC · 本地',
+      enteredAt: now,
+    })),
+  })
+}
+
+/** 本地发起返工。真实环境这里会发出带新旧图纸版本的返工事件，mock 只锁数量。 */
+function initiateRework(id: string | undefined): EngineeringChange {
+  const record = findChange(id)
+  if (record.productionImpact !== 'impacted') {
+    throw new BizError({
+      code: 'ORD_3013',
+      status: 422,
+      message: '仅「对生产有影响」的变更需要发起返工',
+    })
+  }
+  if (record.reworkInitiatedAt) {
+    throw new BizError({ code: 'ORD_3018', status: 409, message: '返工已发起，不可重复发起' })
+  }
+  if (!record.affectedLines?.length) {
+    throw new BizError({
+      code: 'ORD_3016',
+      status: 422,
+      message: '对生产有影响的变更必须先由 PMC 录入受影响数量',
+    })
+  }
+
+  return patchChange(id, {
+    reworkInitiatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+  })
+}
+
 /** 本地评估：把四项写进去，并按入参更新两个下游标志。 */
 function assess(id: string | undefined, body: unknown): EngineeringChange {
   const input = (body ?? {}) as {
     impacts?: Array<{ scope: string; quantity: string; amountMinor?: string | null; note: string }>
+    productionImpact?: string
     routingUpdated?: boolean
     effectiveBatch?: string | null
     needRequote?: boolean
@@ -170,6 +258,7 @@ function assess(id: string | undefined, body: unknown): EngineeringChange {
           : (Number(impact.amountMinor) / 100).toFixed(2),
       note: impact.note,
     })),
+    productionImpact: input.productionImpact === 'impacted' ? 'impacted' : 'none',
     routingUpdated: Boolean(input.routingUpdated),
     effectiveBatch: input.effectiveBatch ?? undefined,
     needRequote: Boolean(input.needRequote),
@@ -195,7 +284,9 @@ export const ECN_ROUTES: Array<{
   {
     path: 'POST /engineering-changes/:id/submit-signoff',
     handle: ([id]) => {
-      assertImpactsAssessed(findChange(id))
+      const record = findChange(id)
+      assertImpactsAssessed(record)
+      assertProductionImpactClassified(record)
       return patchChange(id, { status: 'reviewing' })
     },
   },
@@ -237,6 +328,17 @@ export const ECN_ROUTES: Array<{
   },
   {
     path: 'POST /engineering-changes/:id/close',
-    handle: ([id]) => patchChange(id, { status: 'closed' }),
+    handle: ([id]) => {
+      assertClosable(findChange(id))
+      return patchChange(id, { status: 'closed' })
+    },
+  },
+  {
+    path: 'POST /engineering-changes/:id/affected-quantities',
+    handle: ([id], body) => enterQuantities(id, body),
+  },
+  {
+    path: 'POST /engineering-changes/:id/initiate-rework',
+    handle: ([id]) => initiateRework(id),
   },
 ]

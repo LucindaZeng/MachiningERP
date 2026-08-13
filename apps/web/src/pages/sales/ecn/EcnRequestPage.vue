@@ -1,23 +1,32 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 
-import { assessEcnImpact, fetchEngineeringChange } from '@/api/sales/ecn.api'
+
+import {
+  assessEcnImpact,
+  enterEcnAffectedQuantities,
+  fetchEngineeringChange,
+} from '@/api/sales/ecn.api'
 import PageHeader from '@/components/PageHeader.vue'
 import { useEcnFlow } from '@/composables/use-ecn-flow'
 
+import EcnAffectedQtyDialog from './components/EcnAffectedQtyDialog.vue'
 import EcnAssessDialog from './components/EcnAssessDialog.vue'
 import EcnCreateDialog from './components/EcnCreateDialog.vue'
 import EcnDetailDrawer from './components/EcnDetailDrawer.vue'
 import EcnRejectDialog from './components/EcnRejectDialog.vue'
 import EcnRequestTable from './components/EcnRequestTable.vue'
 
+import type { AffectedQtyPayload } from './components/ecn-affected-qty-payload'
 import type { AssessPayload } from './components/ecn-assess-payload'
 import type { EngineeringChange } from '@/types/sales.types'
+
 
 const detailVisible = ref(false)
 const createVisible = ref(false)
 const assessVisible = ref(false)
 const rejectVisible = ref(false)
+const qtyVisible = ref(false)
 const current = ref<EngineeringChange | null>(null)
 const tableRef = ref<InstanceType<typeof EcnRequestTable> | null>(null)
 const flow = useEcnFlow()
@@ -58,6 +67,23 @@ async function onAssess(payload: AssessPayload): Promise<void> {
     // 服务端的闸门文案原样端出去
     const { ElMessage } = await import('element-plus')
     ElMessage.error(error instanceof Error ? error.message : '保存评估失败')
+  }
+}
+
+/**
+ * PMC 清点录入。与保存评估同一套写法：**服务端的闸门文案原样端出去**——
+ * 「返工已发起，受影响数量不可再修改」这句话本身就是给人看的。
+ */
+async function onEnterQuantities(payload: AffectedQtyPayload): Promise<void> {
+  const ecn = current.value
+  if (!ecn) return
+  try {
+    current.value = await enterEcnAffectedQuantities(ecn.id, ecn.versionLock ?? 0, payload.lines)
+    qtyVisible.value = false
+    await tableRef.value?.reload()
+  } catch (error) {
+    const { ElMessage } = await import('element-plus')
+    ElMessage.error(error instanceof Error ? error.message : '录入受影响数量失败')
   }
 }
 
@@ -110,6 +136,8 @@ function onCreated(change: EngineeringChange): void {
       @reject="rejectVisible = true"
       @execute="current && apply(flow.execute(current))"
       @close="current && apply(flow.close(current))"
+      @enter-qty="qtyVisible = true"
+      @initiate-rework="current && apply(flow.initiateRework(current))"
     />
 
     <EcnAssessDialog
@@ -117,6 +145,13 @@ function onCreated(change: EngineeringChange): void {
       :change="current"
       :busy="flow.busy.value"
       @confirm="onAssess"
+    />
+
+    <EcnAffectedQtyDialog
+      v-model="qtyVisible"
+      :change="current"
+      :busy="flow.busy.value"
+      @confirm="onEnterQuantities"
     />
 
     <EcnRejectDialog v-model="rejectVisible" :busy="flow.busy.value" @confirm="onReject" />

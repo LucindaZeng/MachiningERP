@@ -74,6 +74,10 @@ export const ENGINEERING_CHANGES: EngineeringChange[] = [
       { scope: '已发货批次', quantity: '0 件', amount: '0.00', note: '无' },
     ],
     routingUpdated: true,
+    // 已切料 1000 件为 304——车床已经动过，按口径全部计入受影响数量
+    productionImpact: 'impacted',
+    // 已批准但 PMC 还没清点：这张单结不了案，抽屉里会显示「尚未清点」
+    affectedLines: [],
     needRequote: true,
     needOrderReapproval: true,
     status: 'approved',
@@ -121,6 +125,10 @@ export const ENGINEERING_CHANGES: EngineeringChange[] = [
     ],
     routingUpdated: true,
     effectiveBatch: 'B26071502 起生效',
+    // 只对 B26071502 之后的批次生效，已投产批次沿用原路线——对生产无影响，
+    // 不必清点、不走返工，这条正是「无影响」跳过两步的样子
+    productionImpact: 'none',
+    affectedLines: [],
     needRequote: false,
     needOrderReapproval: false,
     status: 'executing',

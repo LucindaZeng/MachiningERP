@@ -1,5 +1,5 @@
 import { BizError } from './biz-error'
-import { dispatchMock, dispatchUploadMock, isMockEnabled } from './mock/mock-server'
+import { MOCK_ENABLED } from './mock-switch'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 
@@ -21,9 +21,15 @@ interface ApiErrorEnvelope {
   error?: { code?: string; message?: string; traceId?: string; captchaRequired?: boolean }
 }
 
-/** 统一请求出口：只负责传输与错误归一化，不承载任何业务规则。 */
+/**
+ * 统一请求出口：只负责传输与错误归一化，不承载任何业务规则。
+ *
+ * mock 走**动态 import**：`MOCK_ENABLED` 是构建期常量，关闭时整个分支连同
+ * 那棵假数据依赖树一起被摇掉，不会进生产包（理由见 mock-switch.ts）。
+ */
 export async function request<T>(options: RequestOptions): Promise<T> {
-  if (isMockEnabled()) {
+  if (MOCK_ENABLED) {
+    const { dispatchMock } = await import('./mock/mock-server')
     return dispatchMock<T>(options)
   }
 
@@ -64,8 +70,9 @@ export interface UploadOptions {
   onProgress?: (percent: number) => void
 }
 
-export function upload<T>(options: UploadOptions): Promise<T> {
-  if (isMockEnabled()) {
+export async function upload<T>(options: UploadOptions): Promise<T> {
+  if (MOCK_ENABLED) {
+    const { dispatchUploadMock } = await import('./mock/mock-server')
     return dispatchUploadMock<T>(options)
   }
 

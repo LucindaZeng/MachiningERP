@@ -64,6 +64,16 @@ export const DOMAIN_EVENTS = {
    * 已发出的对账单不允许被后来的改动改写。
    */
   SALES_RETURN_CLOSED: 'sales.sales-return.closed',
+  /**
+   * ECN 判为「对生产有影响」且 PMC 已清点数量 → 通知未来的 rework 模块拆返工工单
+   * （业务规格第 6 章新增规则）。
+   *
+   * 与 `SALES_RETURN_REWORK_REQUESTED` 是同一类接缝，但来源不同：
+   * 那条是客户退回来的不良品，这条是**图纸/工艺改了、已投产的那批要按新版重做**。
+   * payload 带新旧图纸版本，因为返工工单必须知道「照哪一版做」——
+   * 只给一个数量，车间无从判断该返成什么样。
+   */
+  ECN_REWORK_REQUESTED: 'engineering.ecn.rework-requested',
 } as const
 
 export type DomainEventName = (typeof DOMAIN_EVENTS)[keyof typeof DOMAIN_EVENTS] | string

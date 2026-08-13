@@ -2,7 +2,7 @@ import { PROXY_SIGNOFF_NOTE } from '../constants/ecn-signoff'
 import { EcnContextService } from '../services/ecn-context.service'
 import { toEcnRequestView } from '../services/ecn-view.mapper'
 
-import { ENGINEER, FULL_IMPACTS, SALES, buildHarness, submittedDrawingEcn } from './harness'
+import { ENGINEER, SALES, assessInput, buildHarness, submittedDrawingEcn } from './harness'
 
 import type { EcnRequestRecord } from '../repositories/ecn.repository.port'
 
@@ -48,6 +48,10 @@ function record(overrides: Partial<EcnRequestRecord> = {}): EcnRequestRecord {
     approvedAt: null,
     closedAt: null,
     rejectReason: null,
+    productionImpact: null,
+    reworkInitiatedAt: null,
+    reworkInitiatedBy: null,
+    affectedLines: [],
     impacts: [
       { id: 'I1', scope: 'WIP', quantity: '1200 件', amountMinor: 1_411_200n, note: '待转序' },
       { id: 'I2', scope: 'SHIPPED', quantity: '0 件', amountMinor: null, note: '无' },
@@ -296,7 +300,7 @@ describe('会签意见与批准通知的其余分支', () => {
     ecn = await harness.requests.startAssessment(ecn.id, ecn.versionLock, ENGINEER)
     ecn = await harness.impacts.assess(
       ecn.id, ecn.versionLock,
-      { impacts: FULL_IMPACTS, routingUpdated: true, effectiveBatch: null, needRequote: false, needOrderReapproval: false },
+      assessInput(),
       ENGINEER,
     )
     ecn = await harness.impacts.submitForSignoff(ecn.id, ecn.versionLock, ENGINEER)
@@ -311,7 +315,7 @@ describe('会签意见与批准通知的其余分支', () => {
     ecn = await harness.requests.startAssessment(ecn.id, ecn.versionLock, ENGINEER)
     ecn = await harness.impacts.assess(
       ecn.id, ecn.versionLock,
-      { impacts: FULL_IMPACTS, routingUpdated: true, effectiveBatch: null, needRequote: false, needOrderReapproval: false },
+      assessInput(),
       ENGINEER,
     )
     ecn = await harness.impacts.submitForSignoff(ecn.id, ecn.versionLock, ENGINEER)
@@ -339,7 +343,7 @@ describe('会签意见与批准通知的其余分支', () => {
     ecn = await harness.requests.startAssessment(ecn.id, ecn.versionLock, ENGINEER)
     ecn = await harness.impacts.assess(
       ecn.id, ecn.versionLock,
-      { impacts: FULL_IMPACTS, routingUpdated: true, effectiveBatch: 'B26071502 起生效', needRequote: false, needOrderReapproval: false },
+      assessInput({ effectiveBatch: 'B26071502 起生效' }),
       ENGINEER,
     )
     ecn = await harness.impacts.submitForSignoff(ecn.id, ecn.versionLock, ENGINEER)
@@ -365,7 +369,7 @@ describe('会签意见与批准通知的其余分支', () => {
     await expect(
       harness.impacts.assess(
         ecn.id, ecn.versionLock,
-        { impacts: FULL_IMPACTS, routingUpdated: true, effectiveBatch: null, needRequote: false, needOrderReapproval: false },
+        assessInput(),
         ENGINEER,
       ),
     ).rejects.toMatchObject({ code: 'ORD_3001' })

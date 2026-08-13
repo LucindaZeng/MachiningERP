@@ -22,6 +22,25 @@ export type EcnStatus =
   | 'closed'
   | 'rejected'
 
+/**
+ * 生产影响分类（业务规格第 6 章新增规则）。
+ *
+ * 只有两档，**不再细分**：`impacted` 一律走「PMC 清点已投产数量 → 返工」，
+ * 细分档位只会让判定的人在边界上纠结，而下游动作其实完全一样。
+ */
+export type EcnProductionImpact = 'none' | 'impacted'
+
+/** PMC 清点录入的一条受影响数量。 */
+export interface EcnAffectedLine {
+  productName: string
+  drawingNo: string
+  /** 已投产数量，定点字符串——数量口径全系统一致，不用 number */
+  affectedQty: string
+  note: string | null
+  enteredBy: string
+  enteredAt: string
+}
+
 export interface EcnImpact {
   scope: string
   quantity: string
@@ -57,6 +76,20 @@ export interface EngineeringChange {
   submittedAt?: string
   /** 驳回理由；服务端要求必填，会随通知送到发起的业务员手上 */
   rejectReason?: string
+  /**
+   * 本轮新增：对生产有无影响（规格第 6 章新增规则）。
+   * 服务端在送会签前强制判定，因此这里是**可选**的——未判定的单据不下发该字段，
+   * 界面据此把「未判定」与「判为无影响」区分开：前者要提醒去填，后者不必。
+   */
+  productionImpact?: EcnProductionImpact
+  /**
+   * PMC 清点录入的受影响数量。计数口径：
+   * **只要生产（车床/CNC）动了就计入，尚未上机的料不计**。
+   * 判为「无影响」的变更恒为空数组。
+   */
+  affectedLines?: EcnAffectedLine[]
+  /** 返工发起时间。一经发起，受影响数量即锁死，界面同时收起录入入口。 */
+  reworkInitiatedAt?: string
   /**
    * 本轮新增：变更链路（图纸版本 ↔ BOM ↔ 报价版本）与跨部门会签明细。
    * 链路是第 6 章「变更可追溯」的落点；会签的 `proxied` 标记让「工程代签」

@@ -1,6 +1,6 @@
 import { request } from '../http'
 
-import type { EngineeringChange } from '@/types/sales.types'
+import type { EcnProductionImpact, EngineeringChange } from '@/types/sales.types'
 
 /**
  * 工程变更申请（ECN-01~05）。
@@ -89,6 +89,8 @@ export function assessEcnImpact(
   versionLock: number,
   payload: {
     impacts: Array<{ scope: string; quantity: string; amountMinor?: string | null; note: string }>
+    /** 对生产有无影响（规格第 6 章新增规则）。未判定的单据服务端不放行送会签。 */
+    productionImpact: EcnProductionImpact
     routingUpdated: boolean
     effectiveBatch?: string | null
     needRequote: boolean
@@ -96,6 +98,25 @@ export function assessEcnImpact(
   },
 ): Promise<EngineeringChange> {
   return action(id, 'assess', { versionLock, ...payload })
+}
+
+/**
+ * PMC 录入已投产（车床/CNC 已动）数量。**整表提交**，与影响评估同一套理由：
+ * 逐条追加会让「清点完了没有」变成一个要靠人记的状态。
+ *
+ * 返工一经发起即锁死，此时服务端返回 ORD_3015，界面把入口收起来。
+ */
+export function enterEcnAffectedQuantities(
+  id: string,
+  versionLock: number,
+  lines: Array<{ productName: string; drawingNo: string; affectedQty: string; note?: string | null }>,
+): Promise<EngineeringChange> {
+  return action(id, 'affected-quantities', { versionLock, lines })
+}
+
+/** 发起返工：服务端发出带新旧图纸版本与逐行数量的返工事件，并锁死数量。 */
+export function initiateEcnRework(id: string, versionLock: number): Promise<EngineeringChange> {
+  return action(id, 'initiate-rework', { versionLock })
 }
 
 /** ECN-03 送跨部门会签；四项影响未评全会被服务端拒绝。 */

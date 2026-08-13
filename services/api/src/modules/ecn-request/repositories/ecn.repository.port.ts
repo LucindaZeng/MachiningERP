@@ -2,6 +2,7 @@ import type {
   EcnChangeType,
   EcnImpactScope,
   EcnOrigin,
+  EcnProductionImpact,
   EcnStatus,
 } from '@prisma/client'
 
@@ -23,6 +24,21 @@ export interface EcnSignoffRecord {
   opinion: string | null
   /** 各部门模块未上线期间由工程代签 */
   proxied: boolean
+}
+
+/**
+ * PMC 清点录入的受影响数量，逐个受影响产品一行。
+ * 计数定义见 constants/ecn-production-impact.ts 的 `AFFECTED_QTY_RULE`。
+ */
+export interface EcnAffectedLineRecord {
+  id: string
+  productName: string
+  drawingNo: string
+  /** 已投产（车床/CNC 已动）数量；decimal 字符串，禁止浮点 */
+  affectedQty: string
+  note: string | null
+  enteredBy: string
+  enteredAt: Date
 }
 
 export interface EcnRequestRecord {
@@ -56,10 +72,18 @@ export interface EcnRequestRecord {
   approvedAt: Date | null
   closedAt: Date | null
   rejectReason: string | null
+  /** 对生产有无影响；评估阶段必填，未判定不得送会签 */
+  productionImpact: EcnProductionImpact | null
+  /** 返工发起时刻；一经发起，受影响数量即锁死 */
+  reworkInitiatedAt: Date | null
+  reworkInitiatedBy: string | null
   impacts: EcnImpactRecord[]
   signoffs: EcnSignoffRecord[]
+  affectedLines: EcnAffectedLineRecord[]
   versionLock: number
 }
+
+export type EcnAffectedLineDraft = Omit<EcnAffectedLineRecord, 'id' | 'enteredAt'>
 
 export type EcnImpactDraft = Omit<EcnImpactRecord, 'id'>
 
@@ -93,6 +117,9 @@ export interface EcnRequestPatch {
   newDrawingVersionId?: string | null
   bomRequestId?: string | null
   quotationId?: string | null
+  productionImpact?: EcnProductionImpact | null
+  reworkInitiatedAt?: Date | null
+  reworkInitiatedBy?: string | null
   submittedAt?: Date | null
   assessedBy?: string | null
   assessedAt?: Date | null
@@ -123,6 +150,13 @@ export interface EcnRepositoryPort {
     id: string,
     versionLock: number,
     impacts: readonly EcnImpactDraft[],
+    updatedBy: string,
+  ): Promise<EcnRequestRecord | null>
+  /** 整表替换受影响数量（PMC 一次录完），同一事务 */
+  replaceAffectedLines(
+    id: string,
+    versionLock: number,
+    lines: readonly EcnAffectedLineDraft[],
     updatedBy: string,
   ): Promise<EcnRequestRecord | null>
   /** 逐条写会签结果；部门不存在则新增（upsert 语义） */

@@ -1,12 +1,18 @@
 import { EcnApprovalService } from '../services/ecn-approval.service'
 import { EcnContextService } from '../services/ecn-context.service'
-import { EcnImpactService } from '../services/ecn-impact.service'
+import {
+  EcnImpactService,
+  type AssessImpactInput,
+  type ImpactInput,
+} from '../services/ecn-impact.service'
+import { EcnProductionService } from '../services/ecn-production.service'
 import { EcnReadService } from '../services/ecn-read.service'
 import { EcnRequestFacade } from '../services/ecn-request.facade'
 import { EcnRequestService } from '../services/ecn-request.service'
 
 import type {
   CreateEcnRequestData,
+  EcnAffectedLineDraft,
   EcnImpactDraft,
   EcnQuery,
   EcnRepositoryPort,
@@ -43,8 +49,12 @@ export class FakeEcnRepository implements EcnRepositoryPort {
       approvedAt: null,
       closedAt: null,
       rejectReason: null,
+      productionImpact: null,
+      reworkInitiatedAt: null,
+      reworkInitiatedBy: null,
       impacts: [],
       signoffs: [],
+      affectedLines: [],
       versionLock: 0,
     }
     this.rows.push(record)
@@ -91,6 +101,23 @@ export class FakeEcnRepository implements EcnRepositoryPort {
     return clone(row)
   }
 
+  async replaceAffectedLines(
+    id: string,
+    versionLock: number,
+    lines: readonly EcnAffectedLineDraft[],
+  ): Promise<EcnRequestRecord | null> {
+    const row = this.rows.find((item) => item.id === id)
+    if (!row || row.versionLock !== versionLock) return null
+
+    row.affectedLines = lines.map((line, index) => ({
+      ...line,
+      id: `AFF-${index + 1}`,
+      enteredAt: new Date(2026, 7, 11, 10, 0),
+    }))
+    row.versionLock += 1
+    return clone(row)
+  }
+
   async recordSignoffs(
     id: string,
     versionLock: number,
@@ -133,11 +160,13 @@ export interface EcnHarness {
   requests: EcnRequestService
   impacts: EcnImpactService
   approvals: EcnApprovalService
+  production: EcnProductionService
   reads: EcnReadService
   facade: EcnRequestFacade
   audits: Array<Record<string, unknown>>
   notifications: Array<Record<string, unknown>>
   timelineNodes: Array<Record<string, unknown>>
+  events: Array<Record<string, unknown>>
 }
 
 export const SALES: { userCode: string; permissions: string[] } = {
@@ -150,11 +179,43 @@ export const ENGINEER: { userCode: string; permissions: string[] } = {
   permissions: ['quote.approve'],
 }
 
-export function buildHarness(): EcnHarness {
+/** PMC：本轮按指令复用既有的订单追踪查看权限，不新造权限点。 */
+export const PMC: { userCode: string; permissions: string[] } = {
+  userCode: 'PMC-2020-0003',
+  permissions: ['order.tracking.view'],
+}
+
+/** 评估入参的标准形状；`productionImpact` 现在是必填。 */
+export function assessInput(
+  overrides: Partial<{
+    productionImpact: string
+    routingUpdated: boolean
+    effectiveBatch: string | null
+    needRequote: boolean
+    needOrderReapproval: boolean
+    impacts: readonly ImpactInput[]
+  }> = {},
+): AssessImpactInput {
+  return {
+    impacts: FULL_IMPACTS,
+    productionImpact: 'NONE',
+    routingUpdated: true,
+    effectiveBatch: null,
+    needRequote: false,
+    needOrderReapproval: false,
+    ...overrides,
+  }
+}
+
+/** `pmcUserCodes` 可空——用来验证「一个 PMC 都没配」时不炸。 */
+export function buildHarness(
+  options: { pmcUserCodes?: string[] } = {},
+): EcnHarness {
   const repository = new FakeEcnRepository()
   const audits: Array<Record<string, unknown>> = []
   const notifications: Array<Record<string, unknown>> = []
   const timelineNodes: Array<Record<string, unknown>> = []
+  const events: Array<Record<string, unknown>> = []
 
   let docSequence = 0
   const numbering = {
@@ -172,6 +233,12 @@ export function buildHarness(): EcnHarness {
       notifications.push(input)
       return input
     },
+    // 群发按一条记下来：本模块要断言的是「发了没有、发给谁」，
+    // 逐个收件人拆成一条条会把这两件事埋进数组长度里。
+    notifyMany: async (recipients: readonly string[], input: Record<string, unknown>) => {
+      notifications.push({ ...input, recipientUserCodes: [...recipients] })
+      return recipients.length
+    },
   }
 
   const requests = new EcnRequestService(
@@ -180,7 +247,13 @@ export function buildHarness(): EcnHarness {
     timeline as never,
     repository,
   )
-  const impacts = new EcnImpactService(requests, audit as never, repository)
+  const impacts = new EcnImpactService(
+    requests,
+    notification as never,
+    { listUserCodesByPermission: async () => options.pmcUserCodes ?? ['PMC-001'] } as never,
+    audit as never,
+    repository,
+  )
   const approvals = new EcnApprovalService(
     requests,
     notification as never,
@@ -194,12 +267,19 @@ export function buildHarness(): EcnHarness {
     { findByUserCode: async (code: string) => ({ displayName: `姓名-${code}` }) } as never,
     { loadVersion: async (id: string) => ({ revision: `REV ${id}` }) } as never,
   )
+  const production = new EcnProductionService(
+    requests,
+    context,
+    { publish: async (event: Record<string, unknown>) => void events.push(event) } as never,
+    audit as never,
+    repository,
+  )
   const reads = new EcnReadService(requests, context, { list: async () => [] } as never)
   const facade = new EcnRequestFacade(requests, context, reads)
 
   return {
-    repository, requests, impacts, approvals, reads, facade,
-    audits, notifications, timelineNodes,
+    repository, requests, impacts, approvals, production, reads, facade,
+    audits, notifications, timelineNodes, events,
   }
 }
 

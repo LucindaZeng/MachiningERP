@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common'
 
+import { EventsModule } from '../../platform/events'
 import { NumberingModule } from '../../platform/numbering'
 import { ContractOrderModule } from '../contract-order'
 import { IdentityModule } from '../identity'
@@ -7,6 +8,7 @@ import { MasterdataModule } from '../masterdata'
 import { QuotationModule } from '../quotation'
 
 import { EcnAssessmentController } from './controllers/ecn-assessment.controller'
+import { EcnProductionController } from './controllers/ecn-production.controller'
 import { EcnReleaseController } from './controllers/ecn-release.controller'
 import { EcnController } from './controllers/ecn.controller'
 import { ECN_REPOSITORY } from './repositories/ecn.repository.port'
@@ -14,6 +16,7 @@ import { PrismaEcnRepository } from './repositories/prisma-ecn.repository'
 import { EcnApprovalService } from './services/ecn-approval.service'
 import { EcnContextService } from './services/ecn-context.service'
 import { EcnImpactService } from './services/ecn-impact.service'
+import { EcnProductionService } from './services/ecn-production.service'
 import { EcnReadService } from './services/ecn-read.service'
 import { EcnRequestFacade } from './services/ecn-request.facade'
 import { EcnRequestService } from './services/ecn-request.service'
@@ -39,21 +42,29 @@ import { EcnRequestService } from './services/ecn-request.service'
 @Module({
   imports: [
     NumberingModule,
+    // 返工发起要发领域事件（engineering.ecn.rework-requested）
+    EventsModule,
     QuotationModule,
     ContractOrderModule,
     MasterdataModule,
     IdentityModule,
   ],
-  controllers: [EcnController, EcnAssessmentController, EcnReleaseController],
+  controllers: [
+    EcnController,
+    EcnAssessmentController,
+    EcnReleaseController,
+    EcnProductionController,
+  ],
   providers: [
     EcnRequestService,
     EcnImpactService,
     EcnApprovalService,
+    EcnProductionService,
     EcnContextService,
     EcnReadService,
     EcnRequestFacade,
     { provide: ECN_REPOSITORY, useClass: PrismaEcnRepository },
   ],
-  exports: [EcnRequestService, EcnImpactService, EcnApprovalService],
+  exports: [EcnRequestService, EcnImpactService, EcnApprovalService, EcnProductionService],
 })
 export class EcnRequestModule {}

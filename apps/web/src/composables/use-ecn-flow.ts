@@ -5,6 +5,7 @@ import {
   approveEcn,
   closeEcn,
   executeEcn,
+  initiateEcnRework,
   rejectEcn,
   returnEcnForDetail,
   signoffEcn,
@@ -32,6 +33,8 @@ export interface UseEcnFlow {
   reject: (ecn: EngineeringChange, reason: string) => Promise<EngineeringChange | null>
   execute: (ecn: EngineeringChange) => Promise<EngineeringChange | null>
   close: (ecn: EngineeringChange) => Promise<EngineeringChange | null>
+  /** PMC 发起返工。确认后数量锁死，因此与批准一样加一道二次确认。 */
+  initiateRework: (ecn: EngineeringChange) => Promise<EngineeringChange | null>
 }
 
 export function useEcnFlow(): UseEcnFlow {
@@ -92,6 +95,14 @@ export function useEcnFlow(): UseEcnFlow {
     execute: (ecn) => run(() => executeEcn(ecn.id, lockOf(ecn)), '已转入执行与批次切换'),
 
     close: (ecn) => run(() => closeEcn(ecn.id, lockOf(ecn)), '变更已结案'),
+
+    initiateRework: async (ecn) =>
+      (await confirmRework())
+        ? run(
+            () => initiateEcnRework(ecn.id, lockOf(ecn)),
+            '返工已发起，受影响数量已锁定',
+          )
+        : null,
   }
 }
 
@@ -101,6 +112,23 @@ async function confirmApprove(): Promise<boolean> {
       '批准后关联的图纸／工艺版本将发布生效，此后任何调整都必须另开一张 ECN。确认批准？',
       '确认批准发布',
       { type: 'warning', confirmButtonText: '确认批准', cancelButtonText: '再看看' },
+    )
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 返工确认。与批准那道确认同一个用意：**这一步之后数量改不了**，
+ * 返工工单是按这个数拆的，事后再改，车间手上的工单与系统里的数就对不上。
+ */
+async function confirmRework(): Promise<boolean> {
+  try {
+    await ElMessageBox.confirm(
+      '发起返工后，本单的受影响数量将被锁定，不可再修改；如需调整只能另开一张变更单。确认发起？',
+      '确认发起返工',
+      { type: 'warning', confirmButtonText: '确认发起', cancelButtonText: '再核一遍' },
     )
     return true
   } catch {

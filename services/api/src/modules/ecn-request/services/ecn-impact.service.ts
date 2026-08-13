@@ -3,7 +3,15 @@ import { Inject, Injectable } from '@nestjs/common'
 
 import { BizError } from '../../../common/errors/biz-error'
 import { AuditService } from '../../../platform/audit'
+import { NotificationService } from '../../../platform/notification'
+import { UserDirectoryService } from '../../identity'
 import { isEcnImpactScope } from '../constants/ecn-impact-scopes'
+import {
+  ECN_PRODUCTION_IMPACT_LABEL,
+  PRODUCTION_IMPACT_FROM_WIRE,
+  isEcnProductionImpact,
+  requiresProductionCount,
+} from '../constants/ecn-production-impact'
 import { ECN_DOC_TYPE } from '../constants/ecn-timeline'
 import {
   ECN_REPOSITORY,
@@ -12,8 +20,11 @@ import {
   type EcnRequestRecord,
 } from '../repositories/ecn.repository.port'
 
+import { assertProductionImpactClassified } from './ecn-production.rules'
 import { EcnRequestService, type EcnActor } from './ecn-request.service'
 import { assertImpactsAssessed } from './ecn-scope.rules'
+
+import type { EcnProductionImpact } from '@prisma/client'
 
 /** 一条影响评估的入参。金额可空——评不出钱与评出零是两回事。 */
 export interface ImpactInput {
@@ -25,6 +36,12 @@ export interface ImpactInput {
 
 export interface AssessImpactInput {
   impacts: readonly ImpactInput[]
+  /**
+   * 对生产有无影响（规格第 6 章新增规则）。**必填**——
+   * 它决定了后面要不要清点已投产数量、要不要走返工。
+   * 接受前端那套小写值（none / impacted）或服务端枚举。
+   */
+  productionImpact: string
   /** 改图是否已同步更新工艺路线（第 6 章硬规则，批准时会再查一次） */
   routingUpdated: boolean
   /** 改工序的生效批次版本 */
@@ -45,6 +62,8 @@ export interface AssessImpactInput {
 export class EcnImpactService {
   constructor(
     private readonly requests: EcnRequestService,
+    private readonly notifications: NotificationService,
+    private readonly users: UserDirectoryService,
     private readonly audit: AuditService,
     @Inject(ECN_REPOSITORY) private readonly repository: EcnRepositoryPort,
   ) {}
@@ -68,11 +87,13 @@ export class EcnImpactService {
     EcnImpactService.assertEngineer(actor)
     const current = await this.requests.load(id)
 
+    const productionImpact = toProductionImpact(input.productionImpact)
     const impacts = toDrafts(input.impacts)
     const saved = await this.repository.replaceImpacts(id, versionLock, impacts, actor.userCode)
     if (!saved) throw new BizError(ECN_ERRORS.NOT_EDITABLE)
 
     const patched = await this.repository.patch(id, saved.versionLock, {
+      productionImpact,
       routingUpdated: input.routingUpdated,
       effectiveBatch: input.effectiveBatch,
       needRequote: input.needRequote,
@@ -91,6 +112,7 @@ export class EcnImpactService {
       before: { status: current.status, impactCount: current.impacts.length },
       after: {
         impactCount: impacts.length,
+        productionImpact,
         routingUpdated: input.routingUpdated,
         needRequote: input.needRequote,
         needOrderReapproval: input.needOrderReapproval,
@@ -112,9 +134,51 @@ export class EcnImpactService {
     const current = await this.requests.load(id)
 
     assertImpactsAssessed(current.impacts.map((impact) => impact.scope))
+    // 新增闸门：未判定「对生产有无影响」不得往下走
+    const productionImpact = assertProductionImpactClassified(current.productionImpact)
 
-    return this.requests.advance({ ...current, versionLock }, 'REVIEWING', actor, {})
+    const advanced = await this.requests.advance({ ...current, versionLock }, 'REVIEWING', actor, {})
+    if (requiresProductionCount(productionImpact)) {
+      await this.notifyPmc(advanced)
+    }
+    return advanced
   }
+
+  /**
+   * 判为「对生产有影响」时叫 PMC 来清点。
+   *
+   * 收件人取 `order.tracking.view` 的持有者——PMC 现有的 ECN 可见性就挂在它上面。
+   * ⚠️ 业务部与总经办同样持有该权限，因此这条通知目前会**多发给他们**；
+   * 标题里点名 PMC 以降低误认，根治要等 PMC 专属权限点（见完成报告 TODO）。
+   */
+  private async notifyPmc(record: EcnRequestRecord): Promise<void> {
+    const recipients = await this.users.listUserCodesByPermission(
+      PERMISSION_CODES.ORDER_TRACKING_VIEW,
+    )
+    if (recipients.length === 0) return
+
+    await this.notifications.notifyMany(recipients, {
+      category: 'ECN_REQUEST',
+      title: `【PMC 待清点】${record.docNo} 对生产有影响`,
+      body:
+        `${record.productName}（${record.drawingNo}）的变更判为「` +
+        `${ECN_PRODUCTION_IMPACT_LABEL.IMPACTED}」，请清点并录入已投产数量。` +
+        '计数口径：只要生产（车床/CNC）动了就计入，尚未上机的料不计。',
+      docType: ECN_DOC_TYPE,
+      docId: record.id,
+    })
+  }
+}
+
+/** 入参 → 枚举。接受前端小写值与服务端枚举两种写法；都不认就是没判定。 */
+function toProductionImpact(value: string): EcnProductionImpact {
+  const normalized = PRODUCTION_IMPACT_FROM_WIRE[value] ?? value
+  if (!isEcnProductionImpact(normalized)) {
+    throw new BizError(ECN_ERRORS.PRODUCTION_IMPACT_REQUIRED, {
+      message: `无法识别的生产影响分类「${value}」；只接受「无影响」或「有影响」`,
+    })
+  }
+  return normalized
 }
 
 /**

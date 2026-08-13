@@ -2,3 +2,17 @@ packages:
   - 'apps/*'
   - 'services/*'
   - 'packages/*'
+
+# 允许执行 postinstall 的依赖白名单。
+# pnpm 10 起该配置从 package.json 的 "pnpm" 字段搬到了这里；留在旧位置只会得到一条
+# WARN，然后**静默跳过这些包的构建脚本**——prisma 不生成 client、esbuild/@swc 没有
+# 原生二进制，问题要到 `pnpm dev:api` 或跑测试时才以完全不相干的报错冒出来。
+onlyBuiltDependencies:
+  - '@nestjs/core'
+  - '@prisma/client'
+  - '@prisma/engines'
+  - '@swc/core'
+  - esbuild
+  - prisma
+  - unrs-resolver
+  - vue-demi

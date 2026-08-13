@@ -74,6 +74,7 @@ export class EcnAssessmentController {
           amountMinor: item.amountMinor ?? null,
           note: item.note,
         })),
+        productionImpact: dto.productionImpact,
         routingUpdated: dto.routingUpdated,
         effectiveBatch: dto.effectiveBatch ?? null,
         needRequote: dto.needRequote,

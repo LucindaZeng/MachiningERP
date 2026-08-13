@@ -6,6 +6,7 @@ import {
   ENGINEER,
   FULL_IMPACTS,
   SALES,
+  assessInput,
   buildHarness,
   submittedDrawingEcn,
   type EcnHarness,
@@ -20,13 +21,7 @@ async function upToReview(harness: EcnHarness): Promise<EcnRequestRecord> {
   record = await harness.impacts.assess(
     record.id,
     record.versionLock,
-    {
-      impacts: FULL_IMPACTS,
-      routingUpdated: true,
-      effectiveBatch: null,
-      needRequote: true,
-      needOrderReapproval: true,
-    },
+    assessInput({ needRequote: true, needOrderReapproval: true }),
     ENGINEER,
   )
   record = await harness.impacts.submitForSignoff(record.id, record.versionLock, ENGINEER)
@@ -126,13 +121,7 @@ describe('ECN-02 影响评估', () => {
     record = await harness.impacts.assess(
       record.id,
       record.versionLock,
-      {
-        impacts: FULL_IMPACTS,
-        routingUpdated: true,
-        effectiveBatch: null,
-        needRequote: true,
-        needOrderReapproval: false,
-      },
+      assessInput({ needRequote: true }),
       ENGINEER,
     )
 
@@ -149,7 +138,7 @@ describe('ECN-02 影响评估', () => {
     record = await harness.impacts.assess(
       record.id,
       record.versionLock,
-      { impacts: FULL_IMPACTS, routingUpdated: true, effectiveBatch: null, needRequote: false, needOrderReapproval: false },
+      assessInput(),
       ENGINEER,
     )
 
@@ -164,13 +153,7 @@ describe('ECN-02 影响评估', () => {
     record = await harness.impacts.assess(
       record.id,
       record.versionLock,
-      {
-        impacts: [{ scope: 'WIP', quantity: '1', amountMinor: '  ', note: '' }],
-        routingUpdated: true,
-        effectiveBatch: null,
-        needRequote: false,
-        needOrderReapproval: false,
-      },
+      assessInput({ impacts: [{ scope: 'WIP', quantity: '1', amountMinor: '  ', note: '' }] }),
       ENGINEER,
     )
     expect(record.impacts[0]!.amountMinor).toBeNull()
@@ -185,10 +168,7 @@ describe('ECN-02 影响评估', () => {
       harness.impacts.assess(
         record.id,
         record.versionLock,
-        {
-          impacts: [{ scope: 'NOWHERE', quantity: '1', amountMinor: null, note: '' }],
-          routingUpdated: true, effectiveBatch: null, needRequote: false, needOrderReapproval: false,
-        },
+        assessInput({ impacts: [{ scope: 'NOWHERE', quantity: '1', amountMinor: null, note: '' }] }),
         ENGINEER,
       ),
     ).rejects.toMatchObject({ code: 'ORD_3009' })
@@ -197,13 +177,12 @@ describe('ECN-02 影响评估', () => {
       harness.impacts.assess(
         record.id,
         record.versionLock,
-        {
+        assessInput({
           impacts: [
             { scope: 'WIP', quantity: '1', amountMinor: null, note: '' },
             { scope: 'WIP', quantity: '2', amountMinor: null, note: '' },
           ],
-          routingUpdated: true, effectiveBatch: null, needRequote: false, needOrderReapproval: false,
-        },
+        }),
         ENGINEER,
       ),
     ).rejects.toMatchObject({ code: 'ORD_3011' })
@@ -216,7 +195,7 @@ describe('ECN-02 影响评估', () => {
       harness.impacts.assess(
         record.id,
         record.versionLock,
-        { impacts: FULL_IMPACTS, routingUpdated: true, effectiveBatch: null, needRequote: false, needOrderReapproval: false },
+        assessInput(),
         SALES,
       ),
     ).rejects.toMatchObject({ code: 'ORD_3003' })
@@ -229,10 +208,7 @@ describe('ECN-02 影响评估', () => {
     record = await harness.impacts.assess(
       record.id,
       record.versionLock,
-      {
-        impacts: [FULL_IMPACTS[0]!],
-        routingUpdated: true, effectiveBatch: null, needRequote: false, needOrderReapproval: false,
-      },
+      assessInput({ impacts: [FULL_IMPACTS[0]!] }),
       ENGINEER,
     )
 
@@ -250,7 +226,7 @@ describe('ECN-02 影响评估', () => {
       harness.impacts.assess(
         record.id,
         record.versionLock - 1,
-        { impacts: FULL_IMPACTS, routingUpdated: true, effectiveBatch: null, needRequote: false, needOrderReapproval: false },
+        assessInput(),
         ENGINEER,
       ),
     ).rejects.toMatchObject({ code: 'ORD_3001' })
@@ -275,7 +251,7 @@ describe('ECN-03 会签', () => {
     record = await harness.requests.startAssessment(record.id, record.versionLock, ENGINEER)
     record = await harness.impacts.assess(
       record.id, record.versionLock,
-      { impacts: FULL_IMPACTS, routingUpdated: true, effectiveBatch: null, needRequote: false, needOrderReapproval: false },
+      assessInput(),
       ENGINEER,
     )
     record = await harness.impacts.submitForSignoff(record.id, record.versionLock, ENGINEER)
@@ -322,7 +298,7 @@ describe('ECN-04 批准与驳回', () => {
     record = await harness.requests.startAssessment(record.id, record.versionLock, ENGINEER)
     record = await harness.impacts.assess(
       record.id, record.versionLock,
-      { impacts: FULL_IMPACTS, routingUpdated: false, effectiveBatch: null, needRequote: false, needOrderReapproval: false },
+      assessInput({ routingUpdated: false }),
       ENGINEER,
     )
     record = await harness.impacts.submitForSignoff(record.id, record.versionLock, ENGINEER)
@@ -397,7 +373,7 @@ describe('ECN-05 执行与结案', () => {
     record = await harness.requests.startAssessment(record.id, record.versionLock, ENGINEER)
     record = await harness.impacts.assess(
       record.id, record.versionLock,
-      { impacts: FULL_IMPACTS, routingUpdated: true, effectiveBatch: null, needRequote: false, needOrderReapproval: false },
+      assessInput(),
       ENGINEER,
     )
     record = await harness.impacts.submitForSignoff(record.id, record.versionLock, ENGINEER)

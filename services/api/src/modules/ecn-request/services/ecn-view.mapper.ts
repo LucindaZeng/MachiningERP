@@ -1,7 +1,9 @@
 import { ECN_IMPACT_SCOPE_LABEL } from '../constants/ecn-impact-scopes'
+import { PRODUCTION_IMPACT_TO_WIRE } from '../constants/ecn-production-impact'
 
 import type { EcnLinkageView } from './ecn-context.service'
 import type { DocTimelineNodeView } from '../../shipment'
+import type { EcnAffectedLineView } from '../dto/ecn-affected-line-view.dto'
 import type { EcnImpactView } from '../dto/ecn-impact-view.dto'
 import type { EcnSignoffView } from '../dto/ecn-signoff-view.dto'
 import type { EcnRequestView } from '../dto/ecn-view.dto'
@@ -60,6 +62,13 @@ export function toEcnRequestView(
     owner: naming.ownerName,
     ...(record.submittedAt ? { submittedAt: toDateTimeText(record.submittedAt) } : {}),
     ...(record.rejectReason ? { rejectReason: record.rejectReason } : {}),
+    ...(record.productionImpact
+      ? { productionImpact: PRODUCTION_IMPACT_TO_WIRE[record.productionImpact] }
+      : {}),
+    affectedLines: record.affectedLines.map(toAffectedLineView),
+    ...(record.reworkInitiatedAt
+      ? { reworkInitiatedAt: toDateTimeText(record.reworkInitiatedAt) }
+      : {}),
     linkage,
     signoffs: record.signoffs.map(toSignoffView),
     timeline,
@@ -78,6 +87,20 @@ function toImpactView(impact: EcnRequestRecord['impacts'][number]): EcnImpactVie
     quantity: impact.quantity,
     amount: impact.amountMinor === null ? '—' : toYuanText(impact.amountMinor),
     note: impact.note,
+  }
+}
+
+function toAffectedLineView(
+  line: EcnRequestRecord['affectedLines'][number],
+): EcnAffectedLineView {
+  return {
+    productName: line.productName,
+    drawingNo: line.drawingNo,
+    // 数量保持定点字符串，不落 Number——口径全库一致
+    affectedQty: line.affectedQty,
+    note: line.note,
+    enteredBy: line.enteredBy,
+    enteredAt: toDateTimeText(line.enteredAt),
   }
 }
 

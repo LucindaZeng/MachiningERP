@@ -2335,8 +2335,15 @@ model EcnRequest {
   updatedBy   String?  @map("updated_by") @db.VarChar(32)
   versionLock Int      @default(0) @map("version_lock")
 
-  impacts  EcnImpact[]
-  signoffs EcnSignoff[]
+  /// 对生产有无影响（规格第 6 章新增规则）。评估阶段必填，未判定不得送会签。
+  productionImpact EcnProductionImpact? @map("production_impact")
+  /// 返工发起时刻。一经发起，受影响数量即锁死
+  reworkInitiatedAt DateTime? @map("rework_initiated_at")
+  reworkInitiatedBy String?   @map("rework_initiated_by") @db.VarChar(32)
+
+  impacts       EcnImpact[]
+  signoffs      EcnSignoff[]
+  affectedLines EcnAffectedLine[]
 
   @@index([customerId, status])
   @@index([orderId])
@@ -2383,4 +2390,47 @@ model EcnSignoff {
 
   @@unique([ecnId, department])
   @@map("ecn_signoffs")
+}
+
+/// 变更对生产的影响（业务规格第 6 章，新增规则）。
+///
+/// 只有两档，**没有中间态**：要么不影响生产、按常规审批批准即生效；
+/// 要么影响生产，那就必须由 PMC 清点已投产数量并把受影响的那部分走返工。
+/// 中间态（「可能有影响」）只会让人把判断推给下一个人。
+enum EcnProductionImpact {
+  /// 对生产无影响：不必再细分，批准即生效
+  NONE
+  /// 对生产有影响：PMC 清点并录入已投产数量，受影响数量走返工流程
+  IMPACTED
+
+  @@map("ecn_production_impact")
+}
+
+/// PMC 清点录入的受影响数量，逐个受影响产品一行。
+///
+/// **计数定义（规格第 6 章）：只要生产（车床/CNC）动了，就计入受影响数量**——
+/// 还没上机的料不计。这条定义写在这里而不是只写在文档里，是因为
+/// 「算不算」这件事一旦各人各判，返工数量就永远对不上，而返工是要花钱的。
+///
+/// MES 尚未上线，因此这是**人工录入**：谁录的、什么时候录的都要留下来。
+/// 返工一经发起即锁死——返工工单是按这个数拆的，事后改数会让车间手上的
+/// 工单与系统里的数对不上。
+model EcnAffectedLine {
+  id    String @id @default(uuid()) @db.Uuid
+  ecnId String @map("ecn_id") @db.Uuid
+
+  productName String @map("product_name") @db.VarChar(128)
+  drawingNo   String @map("drawing_no") @db.VarChar(64)
+  /// 已投产（车床/CNC 已动）的数量；decimal 字符串口径，禁止浮点
+  affectedQty Decimal @map("affected_qty") @db.Decimal(18, 6)
+  note        String? @db.VarChar(500)
+
+  enteredBy String   @map("entered_by") @db.VarChar(32)
+  enteredAt DateTime @default(now()) @map("entered_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  ecn EcnRequest @relation(fields: [ecnId], references: [id], onDelete: Cascade)
+
+  @@unique([ecnId, productName, drawingNo])
+  @@map("ecn_affected_lines")
 }

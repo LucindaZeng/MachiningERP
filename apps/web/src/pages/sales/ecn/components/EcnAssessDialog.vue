@@ -2,7 +2,7 @@
 import { computed, reactive, ref, watch } from 'vue'
 
 import type { AssessPayload } from './ecn-assess-payload'
-import type { EngineeringChange } from '@/types/sales.types'
+import type { EcnProductionImpact, EngineeringChange } from '@/types/sales.types'
 
 /**
  * ECN-02 工程影响评估。
@@ -38,6 +38,11 @@ const visible = computed({
 
 const rows = ref(SCOPES.map((scope) => ({ ...scope, quantity: '', amount: '', note: '' })))
 const form = reactive({
+  /**
+   * 空串 = 尚未判定。不默认成「无影响」——默认值会被当成已经判过，
+   * 而这一项判错的代价是车间照旧图把已投产的那批做完。
+   */
+  productionImpact: '' as EcnProductionImpact | '',
   routingUpdated: false,
   effectiveBatch: '',
   needRequote: false,
@@ -49,6 +54,7 @@ watch(visible, (open) => {
   if (!open) return
   rows.value = SCOPES.map((scope) => ({ ...scope, quantity: '', amount: '', note: '' }))
   Object.assign(form, {
+    productionImpact: props.change?.productionImpact ?? '',
     routingUpdated: props.change?.routingUpdated ?? false,
     effectiveBatch: props.change?.effectiveBatch ?? '',
     needRequote: props.change?.needRequote ?? false,
@@ -64,8 +70,13 @@ const batchWarning = computed(
   () => props.change?.changeType === 'process' && form.effectiveBatch.trim() === '',
 )
 
+/** 未判定就不给提交——服务端也拦，但让人在框里就知道缺什么，比吃一个 422 强。 */
+const unclassified = computed(() => form.productionImpact === '')
+
 function confirm(): void {
+  if (form.productionImpact === '') return
   emit('confirm', {
+    productionImpact: form.productionImpact,
     impacts: rows.value.map((row) => ({
       scope: row.key,
       quantity: row.quantity || '—',
@@ -94,7 +105,7 @@ function toMinor(yuan: string): string {
       type="info"
       :closable="false"
       show-icon
-      title="四项影响必须评全才能送会签"
+      title="四项影响必须评全、且判定对生产有无影响，才能送会签"
       description="金额留空表示「算不出钱」，与填 0（评估过且确实为零）在系统里是两个不同的值——后者会被当作已确认无损失。"
     />
 
@@ -118,6 +129,18 @@ function toMinor(yuan: string): string {
     </el-table>
 
     <el-form class="assess-form" label-width="150px" size="small">
+      <el-form-item label="对生产有无影响" required>
+        <el-radio-group v-model="form.productionImpact">
+          <el-radio value="none">无影响</el-radio>
+          <el-radio value="impacted">有影响（需 PMC 清点已投产数量）</el-radio>
+        </el-radio-group>
+      </el-form-item>
+      <el-form-item v-if="form.productionImpact === 'impacted'" label=" ">
+        <span class="hint">
+          清点口径：<b>只要生产（车床/CNC）动了就计入</b>受影响数量；尚未上机的料不计。
+          送会签后系统会通知 PMC 清点，清点完并发起返工才允许结案。
+        </span>
+      </el-form-item>
       <el-form-item label="已同步改工艺路线">
         <el-switch v-model="form.routingUpdated" />
         <span v-if="routingWarning" class="warn">改图必须联动改工艺路线，否则不允许批准发布</span>
@@ -139,7 +162,9 @@ function toMinor(yuan: string): string {
 
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="busy" @click="confirm">保存评估</el-button>
+      <el-button type="primary" :loading="busy" :disabled="unclassified" @click="confirm">
+        {{ unclassified ? '请先判定对生产有无影响' : '保存评估' }}
+      </el-button>
     </template>
   </el-dialog>
 </template>
@@ -151,6 +176,12 @@ function toMinor(yuan: string): string {
 
 .assess-form {
   margin-top: 16px;
+}
+
+.hint {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--wfx-text-muted);
 }
 
 .warn {

@@ -12,6 +12,13 @@ export class AssessImpactDto {
   @Type(() => ImpactItemDto)
   impacts!: ImpactItemDto[]
 
+  /**
+   * 对生产有无影响（规格第 6 章新增规则）。**必填**。
+   * 用 `IsString` 而不是 `IsIn`：无法识别的值要由服务端给出中文说明，
+   * class-validator 只会说「必须是以下值之一」。
+   */
+  @IsString() productionImpact!: string
+
   @IsBoolean() routingUpdated!: boolean
   @IsOptional() @IsString() @MaxLength(64) effectiveBatch?: string | null
   @IsBoolean() needRequote!: boolean
