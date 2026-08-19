@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 import { registerAuthGuard } from './auth-guard'
+import { moduleRoutes } from './module.routes'
 import { salesRoutes } from './sales.routes'
 
 const router = createRouter({
@@ -17,7 +18,7 @@ const router = createRouter({
       name: 'home',
       component: () => import('@/layouts/MainLayout.vue'),
       redirect: '/sales',
-      children: salesRoutes,
+      children: [...salesRoutes, ...moduleRoutes],
     },
     {
       path: '/:pathMatch(.*)*',

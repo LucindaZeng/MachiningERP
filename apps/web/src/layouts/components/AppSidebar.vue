@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
 
-import logoWhite from '@/assets/brand/wanfuxin-logo-stacked-white.png'
-
 import { MENU_GROUPS } from '../menu.config'
+import logoWhite from '@/assets/brand/wanfuxin-logo-stacked-white.png'
 
 defineProps<{ collapsed: boolean }>()
 
@@ -20,23 +19,17 @@ const route = useRoute()
       <template v-for="group in MENU_GROUPS" :key="group.title">
         <p v-if="!collapsed" class="app-sidebar__group">{{ group.title }}</p>
 
-        <template v-for="item in group.items" :key="item.path">
-          <span v-if="group.disabled" class="app-sidebar__item is-disabled" :title="item.title">
-            <i class="app-sidebar__dot" aria-hidden="true"></i>
-            <span v-if="!collapsed">{{ item.title }}</span>
-          </span>
-
-          <router-link
-            v-else
-            class="app-sidebar__item"
-            :class="{ 'is-active': route.path === item.path }"
-            :to="item.path"
-            :title="item.code ? `${item.title}（${item.code}）` : item.title"
-          >
-            <i class="app-sidebar__dot" aria-hidden="true"></i>
-            <span v-if="!collapsed">{{ item.title }}</span>
-          </router-link>
-        </template>
+        <router-link
+          v-for="item in group.items"
+          :key="item.path"
+          class="app-sidebar__item"
+          :class="{ 'is-active': route.path === item.path }"
+          :to="item.path"
+          :title="item.code ? `${item.title}（${item.code}）` : item.title"
+        >
+          <i class="app-sidebar__dot" aria-hidden="true"></i>
+          <span v-if="!collapsed">{{ item.title }}</span>
+        </router-link>
       </template>
     </nav>
   </aside>
@@ -108,15 +101,6 @@ const route = useRoute()
   font-weight: 600;
   color: #fff;
   background: rgba(223, 145, 30, 0.9);
-}
-
-.app-sidebar__item.is-disabled {
-  color: rgba(255, 255, 255, 0.32);
-  cursor: not-allowed;
-}
-
-.app-sidebar__item.is-disabled:hover {
-  background: transparent;
 }
 
 .app-sidebar__dot {

@@ -3,11 +3,10 @@ import { Bell, Expand, Fold } from '@element-plus/icons-vue'
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
+import { findMenuGroupTitle, findMenuTitle } from '../menu.config'
 import { DEMO_ROLES } from '@/composables/use-permission'
 import { useAuthStore } from '@/stores/auth.store'
 import { useRoleStore } from '@/stores/role.store'
-
-import { findMenuTitle } from '../menu.config'
 
 defineProps<{ collapsed: boolean; alertCount: number }>()
 const emit = defineEmits<{ toggle: []; 'open-alerts': [] }>()
@@ -18,6 +17,7 @@ const authStore = useAuthStore()
 const roleStore = useRoleStore()
 
 const currentTitle = computed(() => findMenuTitle(route.path) || (route.meta.title as string) || '')
+const currentGroup = computed(() => findMenuGroupTitle(route.path))
 
 async function signOut(): Promise<void> {
   await authStore.logout()
@@ -30,7 +30,7 @@ async function signOut(): Promise<void> {
     <div class="app-header__left">
       <el-button text :icon="collapsed ? Expand : Fold" @click="emit('toggle')" />
       <el-breadcrumb separator="/">
-        <el-breadcrumb-item>业务部</el-breadcrumb-item>
+        <el-breadcrumb-item>{{ currentGroup }}</el-breadcrumb-item>
         <el-breadcrumb-item>{{ currentTitle }}</el-breadcrumb-item>
       </el-breadcrumb>
     </div>

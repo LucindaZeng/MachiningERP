@@ -8,7 +8,6 @@ export interface MenuItem {
 export interface MenuGroup {
   title: string
   items: MenuItem[]
-  disabled?: boolean
 }
 
 /** 业务部菜单：与 docs/product/business-department.md 的功能矩阵一一对应。 */
@@ -31,26 +30,31 @@ export const SALES_MENU: MenuGroup = {
   ],
 }
 
-/** 其余部门按十部门蓝图预留，待各自里程碑开发。 */
-export const PENDING_MENU: MenuGroup = {
-  title: '其他部门（规划中）',
-  disabled: true,
+/** 其余九个部门：点击进入本模块总览，含功能清单、关键单据与跨部门数据接口。 */
+export const DEPARTMENT_MENU: MenuGroup = {
+  title: '其他部门',
   items: [
-    { path: '/engineering', title: '工程 / PLM' },
-    { path: '/pmc', title: 'PMC 计划与架机' },
-    { path: '/procurement', title: '采购 / 委外' },
-    { path: '/production', title: '生产 MES' },
-    { path: '/post-process', title: '后工序与组装' },
-    { path: '/quality', title: '品质 QMS' },
-    { path: '/warehouse', title: '仓储 WMS' },
-    { path: '/finance', title: '财务与成本' },
-    { path: '/admin', title: '行政考勤' },
+    { path: '/engineering', title: '工程 / PLM', code: 'ENG' },
+    { path: '/pmc', title: 'PMC 计划与架机', code: 'PMC' },
+    { path: '/procurement', title: '采购 / 委外', code: 'PUR' },
+    { path: '/production', title: '生产 MES', code: 'MES' },
+    { path: '/post-process', title: '后工序与组装', code: 'PST' },
+    { path: '/quality', title: '品质 QMS', code: 'QMS' },
+    { path: '/warehouse', title: '仓储 WMS', code: 'WMS' },
+    { path: '/finance', title: '财务与成本', code: 'FIN' },
+    { path: '/admin', title: '行政考勤', code: 'HRA' },
   ],
 }
 
-export const MENU_GROUPS: MenuGroup[] = [SALES_MENU, PENDING_MENU]
+export const MENU_GROUPS: MenuGroup[] = [SALES_MENU, DEPARTMENT_MENU]
 
 export function findMenuTitle(path: string): string {
   const match = MENU_GROUPS.flatMap((group) => group.items).find((item) => item.path === path)
   return match?.title ?? ''
+}
+
+/** 面包屑第一级：该路径所属的菜单分组，其他部门页不再显示成「业务部」。 */
+export function findMenuGroupTitle(path: string): string {
+  const group = MENU_GROUPS.find((item) => item.items.some((entry) => entry.path === path))
+  return group?.title ?? SALES_MENU.title
 }
